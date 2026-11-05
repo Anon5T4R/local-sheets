@@ -60,7 +60,9 @@ jobs:
           py=python3
           "$py" -c 'import sys' > /dev/null 2>&1 || py=python
           meta="$(cargo metadata --no-deps --format-version 1)"
-          mapfile -t members < <("$py" -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' <<< "$meta")
+          # Windows: o python do runner imprime com \r\n e o mapfile só tira o \n — sem o tr,
+          # os -p chegam com \r grudado ("package `localsheets\r` is not a member").
+          mapfile -t members < <("$py" -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' <<< "$meta" | tr -d '\r')
           args=()
           for member in "${members[@]}"; do args+=(-p "$member"); done
           cargo +nightly fmt "${args[@]}" -- --check
