@@ -1,0 +1,16 @@
+[package]
+name = "localsheets-chart"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets charts: data resolution, layout into toolkit-free primitives, sparklines and a small rasteriser"
+
+[lints]
+workspace = true
+
+[dependencies]
+localsheets-core = { workspace = true }
+localsheets-model = { workspace = true }
+localsheets-calc = { workspace = true }
+localsheets-numfmt = { workspace = true }
+serde = { workspace = true }

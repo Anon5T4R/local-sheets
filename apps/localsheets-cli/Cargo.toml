@@ -1,0 +1,23 @@
+[package]
+name = "localsheets-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets command line: inspect, convert, evaluate, script and serve MCP without a window"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "localsheets-cli"
+path = "src/main.rs"
+
+[dependencies]
+localsheets-engine = { workspace = true }
+localsheets-mcp = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+# `check`: validating the packages Local Sheets writes (content types, relationships).
+zip = { workspace = true }
+quick-xml = { workspace = true }

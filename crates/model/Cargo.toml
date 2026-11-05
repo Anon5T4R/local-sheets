@@ -1,0 +1,18 @@
+[package]
+name = "localsheets-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets document model: workbooks, sheets, cells, styles, tables, charts"
+
+[lints]
+workspace = true
+
+[dependencies]
+localsheets-core = { workspace = true }
+sha2 = { workspace = true }
+localsheets-formula = { workspace = true }
+localsheets-math = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

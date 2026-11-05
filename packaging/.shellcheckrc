@@ -1,0 +1,3 @@
+# shellcheck config for the packaging scripts (run shellcheck by hand; no CI job does today).
+source-path=SCRIPTDIR
+external-sources=true

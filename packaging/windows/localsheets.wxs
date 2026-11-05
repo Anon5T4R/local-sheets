@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Local Sheets MSI (WiX Toolset v5: `dotnet tool install -g wix`, plus its UI and Util extensions:
+  `wix extension add -g WixToolset.UI.wixext/5.0.2` and the same for WixToolset.Util.wixext).
+  Built by package.ps1:
+
+    wix build localsheets.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
+      -d Version=1.2.3 -d BinDir=... -d IconPath=... -d LicenseRtf=...
+      [-d Scope=perUserOrMachine] -o out.msi
+
+  Per-machine install into Program Files\Local Sheets with Start Menu and desktop shortcuts. The
+  installer shows the standard WiX dialogs: welcome + license, progress, and a finish page.
+
+  Built a second time with -d Scope=perUserOrMachine for people without administrator rights: a
+  dual-purpose package that WiX gives ALLUSERS=2 and MSIINSTALLPERUSER=1, so it installs for the
+  current user with no UAC prompt. Windows then redirects Program Files to
+  %LOCALAPPDATA%\Programs, the Start Menu to the user's own, and HKMU to HKCU, so the same
+  components work in both packages. Both share the UpgradeCode: each upgrades its own earlier
+  versions (Windows Installer only matches products installed in the same context).
+
+  UpgradeCode and the component GUIDs below belong to Local Sheets alone. Never copy them from (or
+  into) a sibling Local app: Windows Installer treats every package sharing an UpgradeCode as one
+  product, so a shared code makes one app's installer refuse to install ("a newer version is
+  already installed") or silently uninstall the other.
+-->
+<?ifndef Scope?>
+<?define Scope = perMachine?>
+<?endif?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <?ifndef HasCraftFontLicences ?>
+  <?define HasCraftFontLicences=0 ?>
+  <?endif?>
+  <Package
+      Name="Local Sheets"
+      Manufacturer="Anon5T4R"
+      Version="$(var.Version)"
+      UpgradeCode="55FDA4F8-0254-4A96-8AA0-3D6DA79AD606"
+      Scope="$(var.Scope)"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="Local Sheets spreadsheet" Manufacturer="Anon5T4R" />
+    <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
+         (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of Local Sheets is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="LocalSheetsIcon.exe" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="LocalSheetsIcon.exe" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Anon5T4R/local-sheets" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/Anon5T4R/local-sheets/releases" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Anon5T4R/local-sheets/issues" />
+
+    <!-- Installer UI: WixUI_Minimal is welcome + license, progress, then a finish page so people
+         can see the install worked. package.ps1 builds the license RTF from LICENSE-MIT and
+         LICENSE-APACHE. The finish page offers to launch Local Sheets (ticked by default) through
+         WixShellExec (WixToolset.Util.wixext); silent installs (/qn) never show it. -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Local Sheets" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#LocalSheetsExe]" />
+    <CustomAction Id="LaunchLocalSheets" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec"
+        Impersonate="yes" Return="ignore" />
+    <UI>
+      <ui:WixUI Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchLocalSheets"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Local Sheets" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Local Sheets" Level="1">
+      <ComponentGroupRef Id="AppNotices" />
+      <?if $(var.HasCraftFontLicences) = 1 ?>
+      <ComponentGroupRef Id="CraftFontLicences" />
+      <?endif?>
+      <ComponentGroupRef Id="LocalSheetsFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppNotices" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AppNoticesDir)\**" />
+    </ComponentGroup>
+    <?if $(var.HasCraftFontLicences) = 1 ?>
+    <ComponentGroup Id="CraftFontLicences" Directory="INSTALLFOLDER">
+      <Files Include="$(var.DocsDir)\**" />
+    </ComponentGroup>
+    <?endif?>
+    <ComponentGroup Id="LocalSheetsFiles" Directory="INSTALLFOLDER">
+      <Component Id="LocalSheetsApp" Guid="DEC82DEE-B441-46DE-A82A-26C55AC5D617">
+        <File Id="LocalSheetsExe" Source="$(var.BinDir)\localsheets.exe" KeyPath="yes" />
+
+        <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\localsheets.exe" Value="[#LocalSheetsExe]" Type="string" />
+
+        <!-- ProgIds: how Explorer opens a file with Local Sheets. Nothing here sets HKCR\.<ext>'s
+             default value, so the user's current default app is left alone. Local Sheets has no
+             format of its own: every supported file is a foreign format opened as "Open with". -->
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.Workbook" Value="Local Sheets Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.Workbook\DefaultIcon" Value="&quot;[#LocalSheetsExe]&quot;,0" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.Workbook\shell\open\command" Value="&quot;[#LocalSheetsExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.TextData" Value="Local Sheets Text Data" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.TextData\DefaultIcon" Value="&quot;[#LocalSheetsExe]&quot;,0" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\LocalSheets.TextData\shell\open\command" Value="&quot;[#LocalSheetsExe]&quot; &quot;%1&quot;" Type="string" />
+
+        <!-- "Open with": Windows reads only the value names under OpenWithProgids; the data is
+             ignored (WiX rejects an empty Value, so it repeats the ProgId). -->
+        <RegistryValue Root="HKMU" Key="Software\Classes\.xlsx\OpenWithProgids" Name="LocalSheets.Workbook" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.xlsm\OpenWithProgids" Name="LocalSheets.Workbook" Value="LocalSheets.Workbook" Type="string" />
+        <!-- .xlsb and .ods are imported (data only) into a new workbook that saves as .xlsx. -->
+        <RegistryValue Root="HKMU" Key="Software\Classes\.xlsb\OpenWithProgids" Name="LocalSheets.Workbook" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.ods\OpenWithProgids" Name="LocalSheets.Workbook" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.csv\OpenWithProgids" Name="LocalSheets.TextData" Value="LocalSheets.TextData" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.tsv\OpenWithProgids" Name="LocalSheets.TextData" Value="LocalSheets.TextData" Type="string" />
+
+        <!-- Settings > Default apps: lets the user pick Local Sheets for these types. -->
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities" Name="ApplicationName" Value="Local Sheets" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities" Name="ApplicationDescription" Value="Open-source spreadsheet for .xlsx, CSV and TSV files" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".xlsx" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".xlsm" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".csv" Value="LocalSheets.TextData" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".tsv" Value="LocalSheets.TextData" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\RegisteredApplications" Name="Local Sheets" Value="Software\Anon5T4R\LocalSheets\Capabilities" Type="string" />
+        <!-- Where this MSI installed the app. The app's own updater reads it under the suite's key
+             to know this is an MSI install, so it updates with the new MSI rather than the
+             portable zip. HKMU follows the package's scope: HKLM per-machine, HKCU per-user. -->
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
+      </Component>
+
+      <!-- Shortcuts are plain links to localsheets.exe, not advertised MSI shortcuts: advertised
+           ones point at a Windows Installer descriptor rather than the program, which Windows
+           can't use as a file handler, and Windows Installer caches their icon under its <Icon Id>.
+           Each has its own component with a registry key path (HKMU, so it follows the package's
+           scope), so Windows Installer removes it on uninstall; in the per-machine package both
+           folders are the all-users ones. -->
+      <Component Id="LocalSheetsStartMenuShortcut" Directory="ProgramMenuFolder" Guid="3B8A910C-12B0-449F-9AC4-33E7C03E6925">
+        <Shortcut Id="StartMenuShortcut" Name="Local Sheets" Description="Local Sheets spreadsheet"
+            Target="[#LocalSheetsExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Shortcuts" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <!-- Search alias: Start Menu search matches the shortcut's name, and every Local app name
+           starts with Local — a plain "sheets" finds nothing. Same exe, same icon, own component so
+           uninstall removes it. -->
+      <Component Id="LocalSheetsAliasShortcut" Directory="ProgramMenuFolder" Guid="31D79550-D971-43E8-96D9-7BFDA6D01186">
+        <Shortcut Id="AliasShortcut" Name="Sheets" Description="Local Sheets spreadsheet"
+            Target="[#LocalSheetsExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Shortcuts" Name="Alias" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <Component Id="LocalSheetsDesktopShortcut" Directory="DesktopFolder" Guid="6352C101-D3FD-4506-8270-E06EF402F0EF">
+        <Shortcut Id="DesktopShortcut" Name="Local Sheets" Description="Local Sheets spreadsheet"
+            Target="[#LocalSheetsExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Shortcuts" Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <Component Id="LocalSheetsCli" Guid="D9B28AEE-FF8D-4113-BB5C-57E5BFD50FEF">
+        <File Id="LocalSheetsCliExe" Source="$(var.BinDir)\localsheets-cli.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

@@ -1,0 +1,17 @@
+[package]
+name = "localsheets-calc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets calculation engine: dependency graph, recalculation, evaluator, dynamic arrays"
+
+[lints]
+workspace = true
+
+[dependencies]
+localsheets-core = { workspace = true }
+localsheets-formula = { workspace = true }
+localsheets-functions = { workspace = true }
+localsheets-numfmt = { workspace = true }
+localsheets-model = { workspace = true }
+log = { workspace = true }

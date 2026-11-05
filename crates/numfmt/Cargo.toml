@@ -1,0 +1,12 @@
+[package]
+name = "localsheets-numfmt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets number formats: Excel format codes, General display, TEXT()"
+
+[lints]
+workspace = true
+
+[dependencies]
+localsheets-core = { workspace = true }

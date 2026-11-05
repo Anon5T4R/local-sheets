@@ -1,0 +1,13 @@
+[package]
+name = "localsheets-functions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Sheets worksheet function library: math, statistics, text, dates, lookup, financial, engineering"
+
+[lints]
+workspace = true
+
+[dependencies]
+localsheets-core = { workspace = true }
+regex = { workspace = true }
