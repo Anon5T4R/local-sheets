@@ -2,7 +2,7 @@
 //!
 //! Scans all git-tracked (and untracked, not ignored) files and fails if an asset is not listed
 //! as `` `path` `` in ATTRIBUTION.md's table. An asset is:
-//! - any file under `assets/`, `docs/brand/` or `docs/images/`;
+//! - any file under `assets/` or `docs/images/`;
 //! - any file in `examples/` with an asset or sample-workbook extension (`.xlsx`, `.csv`, ...);
 //! - anywhere else, any image, icon or font file, or a workbook (`.xlsx`/`.xlsm`/`.xls`).
 //!
@@ -21,7 +21,7 @@ const ASSET_EXT: &[&str] =
 /// Extra extensions that count as assets inside `examples/` (sample data).
 const EXAMPLE_EXT: &[&str] = &["csv", "tsv", "json"];
 /// Every file under these directories is an asset.
-const ASSET_DIRS: &[&str] = &["assets/", "docs/brand/", "docs/images/"];
+const ASSET_DIRS: &[&str] = &["assets/", "docs/images/"];
 /// Vendored third-party trees: not this repo's assets, not in ATTRIBUTION.md (see the module doc).
 const VENDORED_DIRS: &[&str] = &["libs/", "vendor/"];
 
@@ -79,9 +79,9 @@ mod tests {
             "crates/x/src/lib.rs".into(),
             "docs/images/b.png".into(),
             "tests/fixture.xlsx".into(),
-            "docs/brand/LICENSE-brand.txt".into(),
+            "docs/images/attributed.png".into(),
         ];
-        let md = "| `assets/app-icon/a.svg` | me | here | MIT |\n| `docs/brand/LICENSE-brand.txt` | x | y | z |";
+        let md = "| `assets/app-icon/a.svg` | me | here | MIT |\n| `docs/images/attributed.png` | x | y | z |";
         assert_eq!(missing(&files, md), vec!["docs/images/b.png".to_string(), "tests/fixture.xlsx".into()]);
     }
 

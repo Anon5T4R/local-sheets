@@ -1,11 +1,14 @@
 Local Sheets
-Copyright (c) 2026 ArtCraft Team and the Local Sheets contributors.
+Fork of GridCraft (https://github.com/storytold/gridcraft), rebranded for the Local suite.
+Copyright (c) 2026 the Local Sheets contributors, and the ArtCraft Team and the GridCraft
+contributors for the upstream work.
 Licensed under the MIT License or the Apache License, Version 2.0, at your option
 (LICENSE-MIT, LICENSE-APACHE).
 
-The ArtCraft name, wordmark and logos in docs/brand/ are trademarks of the ArtCraft Team. They are
-not open source and are not covered by the license above; their terms are in
-docs/brand/LICENSE-brand.txt.
+Local Sheets is an independent fork of GridCraft. "GridCraft" and "ArtCraft" are names of the
+upstream project and its team; this repository and its packages use only the Local Sheets name.
+This fork carries none of the upstream brand assets: the trademark files under the upstream
+docs/brand/ were removed in the rebrand.
 
 Third-party material
 
