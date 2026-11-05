@@ -6,6 +6,10 @@
 //! - any file in `examples/` with an asset or sample-workbook extension (`.xlsx`, `.csv`, ...);
 //! - anywhere else, any image, icon or font file, or a workbook (`.xlsx`/`.xlsm`/`.xls`).
 //!
+//! The vendored trees under `libs/` (and any top-level `vendor/`) are excluded: they are
+//! third-party forks with their own attribution files, built through path dependencies, and this
+//! repo's ATTRIBUTION.md does not list what they carry.
+//!
 //! See the asset rule in AGENTS.md: no vendor artwork, and every asset has an attribution row.
 
 use std::path::Path;
@@ -18,9 +22,16 @@ const ASSET_EXT: &[&str] =
 const EXAMPLE_EXT: &[&str] = &["csv", "tsv", "json"];
 /// Every file under these directories is an asset.
 const ASSET_DIRS: &[&str] = &["assets/", "docs/brand/", "docs/images/"];
+/// Vendored third-party trees: not this repo's assets, not in ATTRIBUTION.md (see the module doc).
+const VENDORED_DIRS: &[&str] = &["libs/", "vendor/"];
 
 fn ext(path: &str) -> String {
     Path::new(path).extension().and_then(std::ffi::OsStr::to_str).map(str::to_ascii_lowercase).unwrap_or_default()
+}
+
+/// Is this path inside a vendored third-party tree?
+pub fn is_vendored(path: &str) -> bool {
+    VENDORED_DIRS.iter().any(|d| path.starts_with(d))
 }
 
 pub fn is_asset(path: &str) -> bool {
@@ -45,7 +56,8 @@ pub fn run(root: &Path) -> Result<(), String> {
     if !out.status.success() {
         return Err(format!("git ls-files failed: {}", String::from_utf8_lossy(&out.stderr)));
     }
-    let files: Vec<String> = String::from_utf8_lossy(&out.stdout).lines().filter(|l| root.join(l).exists()).map(str::to_owned).collect();
+    let files: Vec<String> =
+        String::from_utf8_lossy(&out.stdout).lines().filter(|l| !is_vendored(l) && root.join(l).exists()).map(str::to_owned).collect();
     let md = std::fs::read_to_string(root.join("ATTRIBUTION.md")).map_err(|e| format!("ATTRIBUTION.md: {e}"))?;
     let miss = missing(&files, &md);
     if miss.is_empty() {
@@ -82,5 +94,14 @@ mod tests {
         assert!(is_asset("crates/engine/examples/budget.xlsx"));
         assert!(!is_asset("crates/xlsx/tests/data.csv"));
         assert!(is_asset("crates/ui-egui/icon.PNG"));
+    }
+
+    #[test]
+    fn skips_vendored_trees() {
+        assert!(is_vendored("libs/egui/crates/egui/icon.png"));
+        assert!(is_vendored("libs/winprint.rs/test_data/data.pdf"));
+        assert!(is_vendored("vendor/krilla/logo.svg"));
+        assert!(!is_vendored("assets/app-icon/localsheets.svg"));
+        assert!(!is_vendored("crates/ui-egui/icon.PNG"));
     }
 }
