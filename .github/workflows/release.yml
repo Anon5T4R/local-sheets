@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Fontes CJK/coreanas (craft-fonts)
-        # Mesmo pin do CI e do upstream (gridcraft@e581bc95). Sem elas o binário sai
+        # Mesmo pin do ci.yml: mantenha os dois em sincronia. Sem elas o binário sai
         # sem as fontes embutidas ("building without craft-fonts").
         uses: actions/checkout@v7
         with:

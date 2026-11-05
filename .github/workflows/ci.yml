@@ -32,7 +32,7 @@ jobs:
       - name: Fontes CJK/coreanas (craft-fonts)
         # Sem elas, os testes de texto vertical CJK e IME coreano falham no runner Linux
         # (sem fontes do SO) e o binário release sai sem fontes embutidas.
-        # Mesmo pin do upstream (gridcraft@e581bc95 .github/workflows/ci.yml).
+        # Mesmo pin do release.yml: mantenha os dois em sincronia.
         uses: actions/checkout@v7
         with:
           repository: storytold/craft-fonts
