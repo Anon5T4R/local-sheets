@@ -604,9 +604,10 @@ mod tests {
         }
         // `IMSQRT("i")` is the one case where the Windows UCRT and the Linux libm round the
         // imaginary component differently by one ulp: Excel (measured on Windows) prints
-        // 0.707106781186547, the UCRT prints …548. Same double to within one ulp, so compare
+        // 0.707106781186547, the UCRT prints …548. Same double either way (1/sqrt(2)), so compare
         // numerically here; every other row keeps the exact text parity above.
-        cx(ev("IMSQRT", vec![t("i")]), 0.707_106_781_186_548, 0.707_106_781_186_547);
+        let one_over_sqrt_2 = std::f64::consts::FRAC_1_SQRT_2;
+        cx(ev("IMSQRT", vec![t("i")]), one_over_sqrt_2, one_over_sqrt_2);
         is_text(ev("IMSQRT", vec![t("4")]), "2");
         is_text(ev("IMSQRT", vec![t("-2i")]), "1-i");
         is_text(ev("IMPOWER", vec![t("2+3i"), n(3.0)]), "-46+9i");
