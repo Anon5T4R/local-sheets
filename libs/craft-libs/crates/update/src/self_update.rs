@@ -783,7 +783,10 @@ fn same_cache_as_helper(app: &App, paths: &Paths, exe: &Path) -> Result<(), Stri
 
 /// Accepts `file` when it carries a valid Authenticode signature from the same publisher as
 /// `reference`, this program. Refuses an unsigned file, another publisher's, and every file when
-/// `reference` itself isn't signed.
+/// `reference` itself isn't signed — unless both are unsigned: the Local suite's releases are
+/// unsigned, and the downloader already verified the download against the release's SHA-256
+/// (GitHub's per-asset digest) over HTTPS, which is then the channel's trust anchor. A signed
+/// file offered to an unsigned copy is still refused: it would be another channel's.
 #[cfg(windows)]
 fn signed_like(app: &App, reference: &Path, file: &Path) -> Result<(), String> {
     let publisher = |path: &Path| verifysign::verify_file(path).map(|signature| signature.subject_name());
@@ -1172,6 +1175,32 @@ mod tests {
         assert!(!zip.exists() && !tmp.exists(), "the download and the staging folder are removed");
     }
 
+    /// A copy its MSI registered (an `App Paths` entry naming its exe) updates as an MSI install,
+    /// wherever its folder is. Both sides of the comparison are read in one canonical form, so an
+    /// MSI install never falls through to the portable kind. The per-machine package writes this
+    /// entry under `HKMU` (HKLM); the test writes the same registration in HKCU, which is the hive
+    /// a plain account may record it in and the one the updater reads last.
+    #[cfg(windows)]
+    #[test]
+    fn a_registered_copy_is_an_msi_install() {
+        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+
+        const ID: &str = "localsheets-autoupdate-test";
+        let app = App::new(ID, "Local Sheets Auto Update Test", "Update detection test", "Anon5T4R/local-sheets");
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join(format!("{ID}.exe"));
+        std::fs::write(&exe, "0.1.0").unwrap();
+        let subkey = format!(r"Software\Microsoft\Windows\CurrentVersion\App Paths\{ID}.exe");
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (entry, _) = hkcu.create_subkey_with_flags(&subkey, KEY_WRITE).unwrap();
+        entry.set_value("", &exe.display().to_string()).unwrap();
+        drop(entry);
+        let detected = detect(&app, &exe);
+        hkcu.delete_subkey_all(&subkey).unwrap();
+        assert_eq!(detected, Some(Install::Msi(exe.clone())));
+    }
+
     /// The helper finishes only the launcher's own update: its own installation, with the
     /// download from its own cache. A signed launcher must not run or start anything else.
     #[cfg(windows)]
@@ -1337,7 +1366,8 @@ mod tests {
         gone.id()
     }
 
-    /// A catalog-signed program matches itself; an unsigned one never does, on either side.
+    /// A catalog-signed program matches itself; an unsigned one never does, on either side — but
+    /// two unsigned files are this suite's own channel, which the release's checksum vouches for.
     #[cfg(windows)]
     #[test]
     fn a_file_must_be_signed_by_the_launchers_own_publisher() {
@@ -1346,20 +1376,22 @@ mod tests {
         let unsigned = std::env::current_exe().unwrap();
         assert_eq!(signed_like(&crate::suite::LAUNCHER, &cmd, &cmd), Ok(()));
         assert!(signed_like(&crate::suite::LAUNCHER, &cmd, &unsigned).is_err_and(|e| e.contains("isn't signed")));
-        assert!(signed_like(&crate::suite::LAUNCHER, &unsigned, &cmd).is_err_and(|e| e.contains("doesn't install updates")));
+        assert!(signed_like(&crate::suite::LAUNCHER, &unsigned, &cmd).is_err_and(|e| e.contains("is signed, but this copy")));
+        assert_eq!(signed_like(&crate::suite::LAUNCHER, &unsigned, &unsigned), Ok(()), "an unsigned channel updates itself");
     }
 
-    /// An unsigned launcher says so before it quits for an update. `cargo test` binaries are
-    /// unsigned, like a package built without the signing secrets.
+    /// An unsigned copy (a package built without the signing secrets, like a `cargo test` binary)
+    /// refuses a signed file: it would be another channel's. Its own, unsigned downloads pass the
+    /// check, since the release's SHA-256 already vouched for them.
     #[cfg(windows)]
     #[test]
-    fn an_unsigned_launcher_refuses_to_update_before_it_quits() {
+    fn an_unsigned_copy_refuses_a_signed_install() {
         let dir = tempfile::tempdir().unwrap();
         let msi = dir.path().join("artcraft-launcher-0.2.0-windows-x64.msi");
         std::fs::write(&msi, "not a package").unwrap();
         for install in [Install::Msi(system_program("msiexec.exe")), Install::Portable(system_program("msiexec.exe"))] {
             let error = windows_precheck(&crate::suite::LAUNCHER, &install, &Paths::under(dir.path()), &msi).unwrap_err();
-            assert!(error.contains("isn't signed"), "{error}");
+            assert!(error.contains("is signed, but this copy"), "{error}");
         }
     }
 

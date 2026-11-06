@@ -738,6 +738,14 @@ mod tests {
     }
 
     #[test]
+    fn local_sheets_matches_its_own_installer_publisher() {
+        let sheets = App::by_id("localsheets").unwrap();
+        assert!(is_installer_entry(sheets, "Local Sheets", "Anon5T4R"), "the WiX names Manufacturer=\"Anon5T4R\"");
+        assert!(!is_installer_entry(sheets, "Local Sheets", LEARNING_MACHINES), "the upstream publisher is not this app's");
+        assert!(!is_installer_entry(sheets, "GridCraft", "Anon5T4R"), "the upstream name is a different product");
+    }
+
+    #[test]
     fn pdfcraft_matches_its_former_printcraft_installer_name() {
         let pdf = App::by_id("pdfcraft").unwrap();
         assert!(is_installer_entry(pdf, "PrintCraft", LEARNING_MACHINES), "a PrintCraft entry from {LEARNING_MACHINES} should be PdfCraft's");
