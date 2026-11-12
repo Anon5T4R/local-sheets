@@ -347,7 +347,8 @@ mod tests {
 
     #[test]
     fn print_rejects_empty_or_short_images_before_any_system_call() {
-        let job = Job { printer: "x", settings: None, title: "t", output_file: None, copies: 1, color_policy: ColorPolicy::Unmanaged, primitives: &[] };
+        let job =
+            Job { printer: "x", settings: None, title: "t", output_file: None, copies: 1, color_policy: ColorPolicy::Unmanaged, primitives: &[] };
         let short = RgbImage { width: 2, height: 2, data: &[0; 11] };
         assert!(matches!(print(&job, &short, (0.0, 0.0, 10.0, 10.0)), Err(PrintError::Invalid(_))));
         let ok = RgbImage { width: 2, height: 2, data: &[0; 12] };

@@ -45,8 +45,12 @@ fn ps_quote(s: &str) -> String {
 ///
 /// `context` is prepended to the resulting error message for easier diagnosis.
 fn run_powershell(context: &str, script: &str) -> io::Result<()> {
-    let status =
-        Command::new("powershell").stdin(Stdio::null()).stdout(Stdio::inherit()).stderr(Stdio::inherit()).args(["-NoProfile", "-Command", script]).status()?;
+    let status = Command::new("powershell")
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .args(["-NoProfile", "-Command", script])
+        .status()?;
     if !status.success() {
         return Err(io::Error::new(io::ErrorKind::Other, format!("powershell failed during {context}: exit status {status:?}")));
     }

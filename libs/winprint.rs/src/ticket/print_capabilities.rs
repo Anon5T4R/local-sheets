@@ -57,13 +57,14 @@ impl PrintCapabilities {
     /// Fetch print capabilities XML (without parsing it) for the given printer device and print ticket.
     pub fn fetch_xml_for_ticket(device: &PrinterDevice, ticket: Option<&PrintTicket>) -> Result<Vec<u8>, FetchPrintCapabilitiesError> {
         unsafe {
-            let provider =
-                PTOpenProvider(PCWSTR(wchar::to_wide_chars(device.os_name()).as_ptr()), 1).map_err(FetchPrintCapabilitiesError::OpenProviderFailed)?;
+            let provider = PTOpenProvider(PCWSTR(wchar::to_wide_chars(device.os_name()).as_ptr()), 1)
+                .map_err(FetchPrintCapabilitiesError::OpenProviderFailed)?;
             defer! {
                 let _ = PTCloseProvider(provider);
             }
             let stream = SHCreateMemStream(None).ok_or(FetchPrintCapabilitiesError::StreamNotAllocated)?;
-            let ticket_stream = ticket.map(|x| SHCreateMemStream(Some(x.get_xml())).ok_or(FetchPrintCapabilitiesError::StreamNotAllocated)).transpose()?;
+            let ticket_stream =
+                ticket.map(|x| SHCreateMemStream(Some(x.get_xml())).ok_or(FetchPrintCapabilitiesError::StreamNotAllocated)).transpose()?;
 
             let mut error_message = BSTR::default();
             PTGetPrintCapabilities(provider, ticket_stream.as_ref(), &stream, Some(&mut error_message))
@@ -84,10 +85,9 @@ impl PrintCapabilities {
 
     /// Defines all parameters with default values.
     pub fn default_parameters(&self) -> impl Iterator<Item = ParameterInit> + '_ {
-        self.document
-            .parameter_defs
-            .iter()
-            .filter_map(|param_def| param_def.default_value().map(|default_value| ParameterInit { name: param_def.name.clone(), value: default_value.clone() }))
+        self.document.parameter_defs.iter().filter_map(|param_def| {
+            param_def.default_value().map(|default_value| ParameterInit { name: param_def.name.clone(), value: default_value.clone() })
+        })
     }
 
     /// Defines the given parameters with default values.

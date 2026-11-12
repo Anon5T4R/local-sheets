@@ -56,7 +56,12 @@ impl FilePrinter for ImagePrinter {
         unsafe {
             let absolute_path = std::path::absolute(path).map_err(ImagePrinterError::InvalidPath)?;
             let image_decoder = wic_factory
-                .CreateDecoderFromFilename(PCWSTR(wchar::to_wide_chars(absolute_path.as_os_str()).as_ptr()), None, GENERIC_READ, WICDecodeMetadataCacheOnDemand)
+                .CreateDecoderFromFilename(
+                    PCWSTR(wchar::to_wide_chars(absolute_path.as_os_str()).as_ptr()),
+                    None,
+                    GENERIC_READ,
+                    WICDecodeMetadataCacheOnDemand,
+                )
                 .map_err(ImagePrinterError::FailedToOpenDocument)?;
 
             let page_count = image_decoder.GetFrameCount().map_err(ImagePrinterError::RenderError)?;

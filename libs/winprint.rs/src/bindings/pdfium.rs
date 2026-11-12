@@ -341,10 +341,20 @@ pub struct FPDF_FILEHANDLER_ {
     pub Release: ::core::option::Option<unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void)>,
     pub GetSize: ::core::option::Option<unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void) -> FPDF_DWORD>,
     pub ReadBlock: ::core::option::Option<
-        unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void, offset: FPDF_DWORD, buffer: *mut ::core::ffi::c_void, size: FPDF_DWORD) -> FPDF_RESULT,
+        unsafe extern "C" fn(
+            clientData: *mut ::core::ffi::c_void,
+            offset: FPDF_DWORD,
+            buffer: *mut ::core::ffi::c_void,
+            size: FPDF_DWORD,
+        ) -> FPDF_RESULT,
     >,
     pub WriteBlock: ::core::option::Option<
-        unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void, offset: FPDF_DWORD, buffer: *const ::core::ffi::c_void, size: FPDF_DWORD) -> FPDF_RESULT,
+        unsafe extern "C" fn(
+            clientData: *mut ::core::ffi::c_void,
+            offset: FPDF_DWORD,
+            buffer: *const ::core::ffi::c_void,
+            size: FPDF_DWORD,
+        ) -> FPDF_RESULT,
     >,
     pub Flush: ::core::option::Option<unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void) -> FPDF_RESULT>,
     pub Truncate: ::core::option::Option<unsafe extern "C" fn(clientData: *mut ::core::ffi::c_void, size: FPDF_DWORD) -> FPDF_RESULT>,
@@ -363,7 +373,11 @@ extern "C" {
     pub fn FPDF_DocumentHasValidCrossReferenceTable(document: FPDF_DOCUMENT) -> FPDF_BOOL;
 }
 extern "C" {
-    pub fn FPDF_GetTrailerEnds(document: FPDF_DOCUMENT, buffer: *mut ::std::os::raw::c_uint, length: ::std::os::raw::c_ulong) -> ::std::os::raw::c_ulong;
+    pub fn FPDF_GetTrailerEnds(
+        document: FPDF_DOCUMENT,
+        buffer: *mut ::std::os::raw::c_uint,
+        length: ::std::os::raw::c_ulong,
+    ) -> ::std::os::raw::c_ulong;
 }
 extern "C" {
     pub fn FPDF_GetDocPermissions(document: FPDF_DOCUMENT) -> ::std::os::raw::c_ulong;
@@ -396,7 +410,12 @@ extern "C" {
     pub fn FPDF_GetPageSizeByIndexF(document: FPDF_DOCUMENT, page_index: ::std::os::raw::c_int, size: *mut FS_SIZEF) -> FPDF_BOOL;
 }
 extern "C" {
-    pub fn FPDF_GetPageSizeByIndex(document: FPDF_DOCUMENT, page_index: ::std::os::raw::c_int, width: *mut f64, height: *mut f64) -> ::std::os::raw::c_int;
+    pub fn FPDF_GetPageSizeByIndex(
+        document: FPDF_DOCUMENT,
+        page_index: ::std::os::raw::c_int,
+        width: *mut f64,
+        height: *mut f64,
+    ) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

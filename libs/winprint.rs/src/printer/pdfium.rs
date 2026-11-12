@@ -18,8 +18,8 @@ use windows::{
     core::PCWSTR,
     Win32::{
         Graphics::Gdi::{
-            CreateDCW, DeleteDC, GetDeviceCaps, SetBrushOrgEx, SetGraphicsMode, SetStretchBltMode, GET_DEVICE_CAPS_INDEX, GM_ADVANCED, HALFTONE, LOGPIXELSX,
-            LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH,
+            CreateDCW, DeleteDC, GetDeviceCaps, SetBrushOrgEx, SetGraphicsMode, SetStretchBltMode, GET_DEVICE_CAPS_INDEX, GM_ADVANCED, HALFTONE,
+            LOGPIXELSX, LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH,
         },
         Storage::Xps::{AbortDoc, EndDoc, EndPage, StartDocW, StartPage, DOCINFOW},
     },
@@ -89,7 +89,8 @@ impl FilePrinter for PdfiumPrinter {
             //
             // We check the Chromium source code and it seems that they are using "WINSPOOL" as the driver name, so we will do the same.
             // https://github.com/chromium/chromium/blob/749ad837ac3e74e3988f4a079979e3ea7e926f25/printing/printing_context_win.cc#L489
-            let hdc_print = CreateDCW(PRINT_DRIVER, PCWSTR(wchar::to_wide_chars(self.printer.os_name()).as_ptr()), None, Some(dev_mode.as_ptr() as *const _));
+            let hdc_print =
+                CreateDCW(PRINT_DRIVER, PCWSTR(wchar::to_wide_chars(self.printer.os_name()).as_ptr()), None, Some(dev_mode.as_ptr() as *const _));
             if hdc_print.is_invalid() {
                 return Err(PdfiumPrinterError::FailedToOpenPrinter);
             }
@@ -154,11 +155,16 @@ impl FilePrinter for PdfiumPrinter {
                 let page_std_height = FPDF_GetPageHeight(page);
                 let page_width = (page_std_width * dpi_x as f64 / 72.0).round() as i32;
                 let page_height = (page_std_height * dpi_y as f64 / 72.0).round() as i32;
-                let emf = Emf::new(hdc_print, (page_std_width * 2540.0 / 72.0).round() as i32, (page_std_height * 2540.0 / 72.0).round() as i32, |hdc_emf| {
-                    SetGraphicsMode(hdc_emf, GM_ADVANCED);
-                    FPDF_RenderPage(hdc_emf, page, 0, 0, page_width, page_height, 0, FPDF_PRINTING);
-                    true
-                })
+                let emf = Emf::new(
+                    hdc_print,
+                    (page_std_width * 2540.0 / 72.0).round() as i32,
+                    (page_std_height * 2540.0 / 72.0).round() as i32,
+                    |hdc_emf| {
+                        SetGraphicsMode(hdc_emf, GM_ADVANCED);
+                        FPDF_RenderPage(hdc_emf, page, 0, 0, page_width, page_height, 0, FPDF_PRINTING);
+                        true
+                    },
+                )
                 .map_err(|_| PdfiumPrinterError::EmfCreateFailed(page_index))?;
 
                 let paper_width = get_attr(PHYSICALWIDTH);

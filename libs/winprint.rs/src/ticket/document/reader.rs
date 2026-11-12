@@ -175,9 +175,8 @@ impl ParsableXmlDocument for PrintSchemaDocument {
                                 parameter_init_name = parse_name_attribute(&attributes, &namespace);
                             }
                             "Feature" => {
-                                feature_name.push(parse_name_attribute(&attributes, &namespace).ok_or_else(|| ParsePrintSchemaError::InvalidPrintSchema {
-                                    pos: reader.position(),
-                                    reason: "Feature name not found".to_string(),
+                                feature_name.push(parse_name_attribute(&attributes, &namespace).ok_or_else(|| {
+                                    ParsePrintSchemaError::InvalidPrintSchema { pos: reader.position(), reason: "Feature name not found".to_string() }
                                 })?);
 
                                 // for sub-elements
@@ -205,9 +204,11 @@ impl ParsableXmlDocument for PrintSchemaDocument {
                                 parameter_ref.take();
                             }
                             "Property" => {
-                                property_name.push(parse_name_attribute(&attributes, &namespace).ok_or_else(|| ParsePrintSchemaError::InvalidPrintSchema {
-                                    pos: reader.position(),
-                                    reason: "Property name not found".to_string(),
+                                property_name.push(parse_name_attribute(&attributes, &namespace).ok_or_else(|| {
+                                    ParsePrintSchemaError::InvalidPrintSchema {
+                                        pos: reader.position(),
+                                        reason: "Property name not found".to_string(),
+                                    }
                                 })?);
 
                                 // for sub-elements
@@ -222,7 +223,10 @@ impl ParsableXmlDocument for PrintSchemaDocument {
                                 }
                             }
                             _ => {
-                                return Err(ParsePrintSchemaError::InvalidPrintSchema { pos: reader.position(), reason: format!("Invalid element: {}", name) })
+                                return Err(ParsePrintSchemaError::InvalidPrintSchema {
+                                    pos: reader.position(),
+                                    reason: format!("Invalid element: {}", name),
+                                })
                             }
                         }
                     }
@@ -371,7 +375,9 @@ impl ParsableXmlDocument for PrintCapabilitiesDocument {
     {
         PrintSchemaDocument::parse(reader).and_then(|x| match x {
             PrintSchemaDocument::PrintCapabilities(document) => Ok(document),
-            PrintSchemaDocument::PrintTicket(_) => Err(ParsePrintSchemaError::WrongDocumentType { expected: "PrintCapabilities", found: "PrintTicket" }),
+            PrintSchemaDocument::PrintTicket(_) => {
+                Err(ParsePrintSchemaError::WrongDocumentType { expected: "PrintCapabilities", found: "PrintTicket" })
+            }
         })
     }
 }
@@ -384,7 +390,9 @@ impl ParsableXmlDocument for PrintTicketDocument {
     {
         PrintSchemaDocument::parse(reader).and_then(|x| match x {
             PrintSchemaDocument::PrintTicket(document) => Ok(document),
-            PrintSchemaDocument::PrintCapabilities(_) => Err(ParsePrintSchemaError::WrongDocumentType { expected: "PrintTicket", found: "PrintCapabilities" }),
+            PrintSchemaDocument::PrintCapabilities(_) => {
+                Err(ParsePrintSchemaError::WrongDocumentType { expected: "PrintTicket", found: "PrintCapabilities" })
+            }
         })
     }
 }

@@ -74,7 +74,8 @@ impl PrintCompletionWaiter {
     fn wait_for(&self, timeout: Duration) -> windows::core::Result<()> {
         let (state, ready) = &*self.state;
         let terminal = state.lock().map_err(|_| windows::core::Error::from_hresult(E_UNEXPECTED))?;
-        let (terminal, _) = ready.wait_timeout_while(terminal, timeout, |s| s.is_none()).map_err(|_| windows::core::Error::from_hresult(E_UNEXPECTED))?;
+        let (terminal, _) =
+            ready.wait_timeout_while(terminal, timeout, |s| s.is_none()).map_err(|_| windows::core::Error::from_hresult(E_UNEXPECTED))?;
         match *terminal {
             Some(Ok(())) => Ok(()),
             Some(Err(code)) => Err(windows::core::Error::from_hresult(code)),

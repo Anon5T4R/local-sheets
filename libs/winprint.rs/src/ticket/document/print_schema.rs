@@ -139,7 +139,10 @@ impl fmt::Debug for PropertyValue {
 impl ParameterDef {
     /// Get the default value of this parameter.
     pub fn default_value(&self) -> Option<&PropertyValue> {
-        self.properties.iter().find(|x| x.name.local_name == "DefaultValue" && x.name.namespace_ref() == Some(super::NS_PSF)).and_then(|x| x.value.as_ref())
+        self.properties
+            .iter()
+            .find(|x| x.name.local_name == "DefaultValue" && x.name.namespace_ref() == Some(super::NS_PSF))
+            .and_then(|x| x.value.as_ref())
     }
 }
 
@@ -341,13 +344,15 @@ mod tests {
 
     #[test]
     fn get_properties_from_ticket() {
-        let document1: PrintSchemaDocument = PrintTicketDocument { properties: new_test_properties(), parameter_inits: vec![], features: vec![] }.into();
+        let document1: PrintSchemaDocument =
+            PrintTicketDocument { properties: new_test_properties(), parameter_inits: vec![], features: vec![] }.into();
         check_test_properties(&document1);
     }
 
     #[test]
     fn get_properties_from_capabilities() {
-        let document1: PrintSchemaDocument = PrintCapabilitiesDocument { properties: new_test_properties(), parameter_defs: vec![], features: vec![] }.into();
+        let document1: PrintSchemaDocument =
+            PrintCapabilitiesDocument { properties: new_test_properties(), parameter_defs: vec![], features: vec![] }.into();
         check_test_properties(&document1);
     }
 

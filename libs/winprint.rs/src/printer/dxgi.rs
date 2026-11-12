@@ -104,7 +104,8 @@ impl DxgiPrintContext {
                 } else {
                     None
                 };
-                let dpi_y = if (dev_mode.dmFields & windows::Win32::Graphics::Gdi::DM_YRESOLUTION).0 != 0 { Some(dev_mode.dmYResolution) } else { None };
+                let dpi_y =
+                    if (dev_mode.dmFields & windows::Win32::Graphics::Gdi::DM_YRESOLUTION).0 != 0 { Some(dev_mode.dmYResolution) } else { None };
                 match (dpi_x, dpi_y) {
                     (Some(x), Some(y)) => max(x, y),
                     (Some(x), None) => x,
@@ -160,7 +161,8 @@ impl DxgiPrintContext {
             let completion_waiter = completion_source.waiter();
             let completion_source: IPrintDocumentPackageStatusEvent = completion_source.into();
             let cpc: IConnectionPointContainer = document_target.cast().map_err(DxgiPrintContextError::FailedToCreateEvent)?;
-            let status_connection = cpc.FindConnectionPoint(&IPrintDocumentPackageStatusEvent::IID).map_err(DxgiPrintContextError::FailedToCreateEvent)?;
+            let status_connection =
+                cpc.FindConnectionPoint(&IPrintDocumentPackageStatusEvent::IID).map_err(DxgiPrintContextError::FailedToCreateEvent)?;
             let status_cookie = status_connection.Advise(&completion_source).map_err(DxgiPrintContextError::FailedToCreateEvent)?;
 
             Ok(Self {

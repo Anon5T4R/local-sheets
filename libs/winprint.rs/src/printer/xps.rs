@@ -89,8 +89,9 @@ impl FilePrinter for XpsPrinter {
                 .map_err(XpsPrinterError::FailedToApplyPrintTicket)?;
             print_ticket_stream.Close().map_err(XpsPrinterError::FailedToApplyPrintTicket)?;
             let document_stream = document_stream.ok_or(XpsPrinterError::StreamNotAvailable)?;
-            let xps_package =
-                xps_factory.CreatePackageFromFile(PCWSTR(wchar::to_wide_chars(path).as_ptr()), false).map_err(XpsPrinterError::FailedToWriteDocument)?;
+            let xps_package = xps_factory
+                .CreatePackageFromFile(PCWSTR(wchar::to_wide_chars(path).as_ptr()), false)
+                .map_err(XpsPrinterError::FailedToWriteDocument)?;
             xps_package.WriteToStream(&document_stream, false).map_err(XpsPrinterError::FailedToWriteDocument)?;
             document_stream.Close().map_err(XpsPrinterError::FailedToWriteDocument)?;
             WaitForSingleObject(event, INFINITE);

@@ -38,8 +38,9 @@ pub enum PrintTicketBuilderError {
 impl PrintTicketBuilder {
     /// Create a new print ticket builder for the given printer device.
     pub fn new(device: &PrinterDevice) -> Result<Self, PrintTicketBuilderError> {
-        let provider =
-            unsafe { PTOpenProvider(PCWSTR(wchar::to_wide_chars(device.os_name()).as_ptr()), 1).map_err(PrintTicketBuilderError::OpenProviderFailed)? };
+        let provider = unsafe {
+            PTOpenProvider(PCWSTR(wchar::to_wide_chars(device.os_name()).as_ptr()), 1).map_err(PrintTicketBuilderError::OpenProviderFailed)?
+        };
         Ok(Self { xml: DEFAULT_PRINT_TICKET_XML.into(), provider })
     }
 

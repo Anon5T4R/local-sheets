@@ -29,9 +29,9 @@ fn try_link_pdfium() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(target_path.as_path())?;
 
     let has_bin = fs::read_dir(target_path.as_path())?.any(|x| {
-        bin_ext
-            .iter()
-            .any(|s| x.as_ref().ok().and_then(|d| if Path::new(d.file_name().as_os_str()).extension() == Some(s) { Some(()) } else { None }).is_some())
+        bin_ext.iter().any(|s| {
+            x.as_ref().ok().and_then(|d| if Path::new(d.file_name().as_os_str()).extension() == Some(s) { Some(()) } else { None }).is_some()
+        })
     });
     let verified_marker = target_path.join(VERIFIED_MARKER_FILE);
 

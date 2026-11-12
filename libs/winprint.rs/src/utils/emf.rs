@@ -14,14 +14,14 @@ use windows::{
         Foundation::{LPARAM, RECT},
         Graphics::{
             Gdi::{
-                CloseEnhMetaFile, CreateEnhMetaFileW, DeleteEnhMetaFile, EnumEnhMetaFile, GetEnhMetaFileHeader, GetWorldTransform, ModifyWorldTransform,
-                PlayEnhMetaFileRecord, SetWorldTransform, StretchDIBits, BITMAPINFO, BITMAPINFOHEADER, BI_JPEG, BI_PNG, BI_RGB, DIB_USAGE, EMRSTRETCHDIBITS,
-                EMR_MODIFYWORLDTRANSFORM, EMR_SETLAYOUT, EMR_SETWORLDTRANSFORM, EMR_STRETCHDIBITS, ENHMETAHEADER, ENHMETARECORD, HANDLETABLE, HDC,
-                HENHMETAFILE, MWT_IDENTITY, MWT_LEFTMULTIPLY, MWT_RIGHTMULTIPLY, ROP_CODE, XFORM,
+                CloseEnhMetaFile, CreateEnhMetaFileW, DeleteEnhMetaFile, EnumEnhMetaFile, GetEnhMetaFileHeader, GetWorldTransform,
+                ModifyWorldTransform, PlayEnhMetaFileRecord, SetWorldTransform, StretchDIBits, BITMAPINFO, BITMAPINFOHEADER, BI_JPEG, BI_PNG, BI_RGB,
+                DIB_USAGE, EMRSTRETCHDIBITS, EMR_MODIFYWORLDTRANSFORM, EMR_SETLAYOUT, EMR_SETWORLDTRANSFORM, EMR_STRETCHDIBITS, ENHMETAHEADER,
+                ENHMETARECORD, HANDLETABLE, HDC, HENHMETAFILE, MWT_IDENTITY, MWT_LEFTMULTIPLY, MWT_RIGHTMULTIPLY, ROP_CODE, XFORM,
             },
             Imaging::{
-                CLSID_WICImagingFactory2, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, WICBitmapPaletteTypeMedianCut, WICDecodeMetadataCacheOnDemand,
-                D2D::IWICImagingFactory2,
+                CLSID_WICImagingFactory2, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, WICBitmapPaletteTypeMedianCut,
+                WICDecodeMetadataCacheOnDemand, D2D::IWICImagingFactory2,
             },
         },
         System::Com::{CoCreateInstance, CLSCTX_ALL},
@@ -94,9 +94,16 @@ impl Emf {
         Err(EmfPlaybackFailedError)
     }
 
-    unsafe extern "system" fn playback_proc(hdc: HDC, handle_table: *const HANDLETABLE, record: *const ENHMETARECORD, handle_count: i32, param: LPARAM) -> i32 {
+    unsafe extern "system" fn playback_proc(
+        hdc: HDC,
+        handle_table: *const HANDLETABLE,
+        record: *const ENHMETARECORD,
+        handle_count: i32,
+        param: LPARAM,
+    ) -> i32 {
         let context = &mut *(param.0 as *mut EnumerationContext);
-        let handle_table_slice = if handle_table.is_null() || handle_count <= 0 { &[] } else { slice::from_raw_parts(handle_table, handle_count as usize) };
+        let handle_table_slice =
+            if handle_table.is_null() || handle_count <= 0 { &[] } else { slice::from_raw_parts(handle_table, handle_count as usize) };
         match play_record(hdc, record, handle_table_slice, context) {
             true => 1,
             false => 0,

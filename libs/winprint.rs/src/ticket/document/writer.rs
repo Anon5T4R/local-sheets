@@ -249,7 +249,11 @@ fn format_name(name: &OwnedName) -> Cow<'_, String> {
     }
 }
 
-fn start_element_with_optional_name<W: Write>(writer: &mut EventWriter<W>, elem_name: &str, name: Option<&OwnedName>) -> Result<(), xml::writer::Error> {
+fn start_element_with_optional_name<W: Write>(
+    writer: &mut EventWriter<W>,
+    elem_name: &str,
+    name: Option<&OwnedName>,
+) -> Result<(), xml::writer::Error> {
     if let Some(name) = name {
         writer.write(XmlEvent::start_element(elem_name).attr("name", format_name(name).as_ref()))?;
     } else {

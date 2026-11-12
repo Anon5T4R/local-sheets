@@ -7,9 +7,10 @@ use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::Graphics::Gdi::{
-    BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateDCW, CreatePen, DEVMODEW, DIB_RGB_COLORS, DM_IN_BUFFER, DM_IN_PROMPT, DM_OUT_BUFFER, DeleteDC, DeleteObject,
-    Ellipse, GetDeviceCaps, GetStockObject, HALFTONE, HDC, HOLLOW_BRUSH, HORZRES, LOGPIXELSX, LOGPIXELSY, LineTo, MoveToEx, PHYSICALHEIGHT, PHYSICALOFFSETX,
-    PHYSICALOFFSETY, PHYSICALWIDTH, PS_SOLID, SRCCOPY, SelectObject, SetBrushOrgEx, SetStretchBltMode, StretchDIBits, VERTRES,
+    BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateDCW, CreatePen, DEVMODEW, DIB_RGB_COLORS, DM_IN_BUFFER, DM_IN_PROMPT, DM_OUT_BUFFER, DeleteDC,
+    DeleteObject, Ellipse, GetDeviceCaps, GetStockObject, HALFTONE, HDC, HOLLOW_BRUSH, HORZRES, LOGPIXELSX, LOGPIXELSY, LineTo, MoveToEx,
+    PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH, PS_SOLID, SRCCOPY, SelectObject, SetBrushOrgEx, SetStretchBltMode,
+    StretchDIBits, VERTRES,
 };
 use windows_sys::Win32::Graphics::Printing::{
     ClosePrinter, DocumentPropertiesW, EnumPrintersW, GetDefaultPrinterW, OpenPrinterW, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL, PRINTER_HANDLE,
@@ -188,7 +189,9 @@ impl Dc {
         let normalized = if manual_copies {
             let defaults = match settings {
                 Some(s) => s.clone(),
-                None => properties(printer, None, None, false)?.ok_or_else(|| PrintError::Invalid("the printer refused its default settings".into()))?,
+                None => {
+                    properties(printer, None, None, false)?.ok_or_else(|| PrintError::Invalid("the printer refused its default settings".into()))?
+                }
             };
             Some(defaults.for_manual_copies()?)
         } else {
@@ -265,7 +268,10 @@ pub fn page(printer: &str, settings: Option<&DevMode>) -> Result<Page> {
 fn dib(image: &RgbImage<'_>) -> Result<(BITMAPINFO, Vec<u8>)> {
     let (w, h) = (image.width as usize, image.height as usize);
     let stride = (w.checked_mul(3).ok_or_else(|| PrintError::Invalid("image too large".into()))? + 3) & !3;
-    let total = stride.checked_mul(h).filter(|t| *t <= i32::MAX as usize).ok_or_else(|| PrintError::Invalid("image too large to print in one piece".into()))?;
+    let total = stride
+        .checked_mul(h)
+        .filter(|t| *t <= i32::MAX as usize)
+        .ok_or_else(|| PrintError::Invalid("image too large to print in one piece".into()))?;
     let mut bits = vec![0u8; total];
     for (y, src) in image.data.chunks_exact(w * 3).enumerate() {
         let start = (h - 1 - y) * stride;
@@ -414,8 +420,9 @@ pub fn print(job: &Job<'_>, image: &RgbImage<'_>, rect: (f64, f64, f64, f64)) ->
         }
         // SAFETY: `bits` is a bottom-up DIB exactly as `bmi` describes (24-bit, padded rows,
         // `biSizeImage` bytes); the source rectangle is the whole image.
-        let lines =
-            unsafe { StretchDIBits(dc.0, x, y, w, h, 0, 0, image.width as i32, image.height as i32, bits.as_ptr().cast(), &bmi, DIB_RGB_COLORS, SRCCOPY) };
+        let lines = unsafe {
+            StretchDIBits(dc.0, x, y, w, h, 0, 0, image.width as i32, image.height as i32, bits.as_ptr().cast(), &bmi, DIB_RGB_COLORS, SRCCOPY)
+        };
         if lines <= 0 {
             return Err(fail("sending the image to the printer"));
         }
