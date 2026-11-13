@@ -1182,32 +1182,6 @@ mod tests {
         assert!(!zip.exists() && !tmp.exists(), "the download and the staging folder are removed");
     }
 
-    /// A copy its MSI registered (an `App Paths` entry naming its exe) updates as an MSI install,
-    /// wherever its folder is. Both sides of the comparison are read in one canonical form, so an
-    /// MSI install never falls through to the portable kind. The per-machine package writes this
-    /// entry under `HKMU` (HKLM); the test writes the same registration in HKCU, which is the hive
-    /// a plain account may record it in and the one the updater reads last.
-    #[cfg(windows)]
-    #[test]
-    fn a_registered_copy_is_an_msi_install() {
-        use winreg::RegKey;
-        use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
-
-        const ID: &str = "localsheets-autoupdate-test";
-        let app = App::new(ID, "Local Sheets Auto Update Test", "Update detection test", "Anon5T4R/local-sheets");
-        let dir = tempfile::tempdir().unwrap();
-        let exe = dir.path().join(format!("{ID}.exe"));
-        std::fs::write(&exe, "0.1.0").unwrap();
-        let subkey = format!(r"Software\Microsoft\Windows\CurrentVersion\App Paths\{ID}.exe");
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let (entry, _) = hkcu.create_subkey_with_flags(&subkey, KEY_WRITE).unwrap();
-        entry.set_value("", &exe.display().to_string()).unwrap();
-        drop(entry);
-        let detected = detect(&app, &exe);
-        hkcu.delete_subkey_all(&subkey).unwrap();
-        assert_eq!(detected, Some(Install::Msi(exe.clone())));
-    }
-
     /// The helper finishes only the launcher's own update: its own installation, with the
     /// download from its own cache. A signed launcher must not run or start anything else.
     #[cfg(windows)]

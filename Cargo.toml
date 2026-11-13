@@ -33,7 +33,7 @@ localsheets-math = { path = "crates/math" }
 # the app) comes from the one vendored craft-libs tree (c5a1cbf): path dependencies, since the CI
 # rejects git sources.
 # craft-update: app-specific pretend versions apply to startup and manual checks.
-craft-update = { path = "libs/craft-libs/crates/update/", version = "=0.1.0", features = ["egui"] }
+craft-update = { path = "libs/craft-libs/crates/update/", version = "=0.1.0", features = ["egui", "icons"] }
 
 # foundation
 thiserror = "2"
