@@ -86,6 +86,32 @@ fn a_streamed_sheet_answer_becomes_an_outcome() {
     }
 }
 
+/// A streamed answer whose cells carry formulas (`{"f": ...}`) reaches the window as formulas, and
+/// a `{"v": "=..."}` stays text: the two channels the contract now separates.
+#[test]
+fn a_streamed_formula_cell_keeps_its_channel() {
+    let json = r#"{"columns":["A","B","Soma"],"rows":[[2,3,{"f":"=A2+B2"}],[4,5,{"v":"=A3+B3"}]]}"#;
+    let (head, tail) = json.split_at(28);
+    let port = serve(move |socket| {
+        let _ = socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+        delta_event(socket, head);
+        delta_event(socket, tail);
+        chunk(socket, "data: [DONE]\n\n");
+        let _ = socket.write_all(b"0\r\n\r\n");
+    });
+    let answer = local_ai::chat_stream_with_key(&app(), &connection(port), "", &[Msg::User("soma".into())], &mut |_: &str| {})
+        .expect("the streamed answer arrives");
+    let request = localsheets_ai::Request::GenerateSheet { topic: "soma".into(), rows: 2 };
+    let outcome = localsheets_ai::actions::interpret(&request, &answer).expect("a sheet");
+    match outcome {
+        localsheets_ai::Outcome::Sheet { rows, .. } => {
+            assert_eq!(rows[0][2], localsheets_ai::Cell::Formula("=A2+B2".into()));
+            assert_eq!(rows[1][2], localsheets_ai::Cell::Value(serde_json::json!("=A3+B3")), "a plain value stays text");
+        }
+        other => panic!("expected a sheet, got {other:?}"),
+    }
+}
+
 /// A provider error is not swallowed: the status is not a success, the body is read and its message
 /// reaches the caller, which is what the banner shows.
 #[test]

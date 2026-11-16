@@ -13,7 +13,8 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 
 use egui::{Context, RichText, Ui};
 use localsheets_ai::local_ai::{self, Connection};
-use localsheets_ai::{AI_APP_ID, AI_APP_URL, Backend, LiveBackend, Outcome, Request};
+use localsheets_ai::{AI_APP_ID, AI_APP_URL, Backend, Cell, LiveBackend, Outcome, Request};
+use localsheets_engine::EngineError;
 use localsheets_engine::Session;
 use localsheets_engine::core::{CellRef, MAX_COLS, MAX_ROWS, RangeRef};
 use serde_json::{Value, json};
@@ -27,6 +28,7 @@ enum Event {
 }
 
 /// Where an outcome is applied, in engine terms.
+#[derive(Clone)]
 pub(crate) enum Apply {
     /// A new sheet (the outcome carries the cells).
     Sheet,
@@ -203,11 +205,13 @@ impl Ai {
             }
         };
         match localsheets_ai::actions::interpret(&running.request, &answer) {
-            Ok(outcome) => match self.apply(session, &running.request, running.apply, outcome) {
+            Ok(outcome) => match self.apply(session, &running.request, running.apply.clone(), outcome) {
                 Ok(true) => true,
                 Ok(false) => false,
                 Err(error) => {
-                    self.error = Some(error);
+                    // The suite's gesture for a refused artifact action: the dialog comes back with
+                    // the engine's reason and the user's parameters, ready to adjust.
+                    self.reopen_after_refusal(&running.request, running.apply, error);
                     false
                 }
             },
@@ -216,6 +220,27 @@ impl Ai {
                 false
             }
         }
+    }
+
+    /// Reopens the dialog a refused action came from (Generate and Fill; the Formula action already
+    /// answers in its own dialog). The reason goes into the dialog, not the strip.
+    fn reopen_after_refusal(&mut self, request: &Request, apply: Apply, error: String) {
+        self.dialog = match (request, apply) {
+            (Request::GenerateSheet { topic, rows }, _) => Some(Dialog::Generate { topic: topic.clone(), rows: *rows, error: Some(error) }),
+            (Request::FillColumn { header, context, count }, Apply::Fill { start, range }) => Some(Dialog::Fill {
+                header: header.clone(),
+                context: context.clone(),
+                target: range,
+                start,
+                count: *count,
+                single: false,
+                error: Some(error),
+            }),
+            _ => {
+                self.error = Some(error);
+                None
+            }
+        };
     }
 
     fn tick_models(&mut self) {
@@ -248,14 +273,19 @@ impl Ai {
                             Err(_) => s.execute("home.insertSheet", json!({}))?,
                         };
                         let index = inserted.get("index").and_then(Value::as_u64).unwrap_or(0);
+                        // The new sheet is the one the formulas are entered in (and the one the
+                        // engine evaluates them against).
+                        s.execute("sheet.activate", json!({ "sheet": index }))?;
                         let mut matrix: Vec<Vec<Value>> = Vec::with_capacity(rows.len() + 1);
                         matrix.push(columns.into_iter().map(Value::String).collect());
-                        matrix.extend(rows);
+                        let (data, formulas) = cells_matrix(rows, CellRef::new(1, 0));
+                        matrix.extend(data);
                         let (matrix, post) = split_equals(matrix, CellRef::new(0, 0));
                         s.execute("range.setValues", json!({ "sheet": index, "range": "A1", "values": matrix, "parse": false }))?;
                         for (cell, text) in post {
                             s.execute("cell.set", json!({ "sheet": index, "cell": cell.a1(), "input": format!("'{text}") }))?;
                         }
+                        write_formulas(s, &formulas)?;
                         Ok(())
                     })
                     .map_err(|e| e.to_string())?;
@@ -264,12 +294,14 @@ impl Ai {
             (Request::FillColumn { .. }, Apply::Fill { start, range }, Outcome::Values { values }) => {
                 session
                     .grouped("AI: fill column", |s| {
-                        let matrix: Vec<Vec<Value>> = values.into_iter().map(|value| vec![value]).collect();
+                        let rows: Vec<Vec<Cell>> = values.into_iter().map(|cell| vec![cell]).collect();
+                        let (matrix, formulas) = cells_matrix(rows, start);
                         let (matrix, post) = split_equals(matrix, start);
                         s.execute("range.setValues", json!({ "range": range, "values": matrix, "parse": false }))?;
                         for (cell, text) in post {
                             s.execute("cell.set", json!({ "cell": cell.a1(), "input": format!("'{text}") }))?;
                         }
+                        write_formulas(s, &formulas)?;
                         Ok(())
                     })
                     .map_err(|e| e.to_string())?;
@@ -404,6 +436,44 @@ fn sheet_name(title: &str) -> String {
     let name: String = title.chars().filter(|c| !matches!(c, '[' | ']' | ':' | '*' | '?' | '/' | '\\') && !c.is_control()).take(31).collect();
     let name = name.trim();
     if name.is_empty() { "AI".to_string() } else { name.to_string() }
+}
+
+/// The `range.setValues` matrix and the formula cells of an answer. A formula cell is left empty in
+/// the matrix (the value pass never writes a formula as text) and is entered by [`write_formulas`]
+/// once the cells it references exist.
+fn cells_matrix(rows: Vec<Vec<Cell>>, start: CellRef) -> (Vec<Vec<Value>>, Vec<(CellRef, String)>) {
+    let mut matrix = Vec::with_capacity(rows.len());
+    let mut formulas = Vec::new();
+    for (row, cells) in rows.into_iter().enumerate() {
+        let mut line = Vec::with_capacity(cells.len());
+        for (col, cell) in cells.into_iter().enumerate() {
+            match cell {
+                Cell::Value(value) => line.push(value),
+                Cell::Formula(formula) => {
+                    line.push(Value::Null);
+                    if let Some(at) = start.offset(row as i64, col as i64) {
+                        formulas.push((at, formula));
+                    }
+                }
+            }
+        }
+        matrix.push(line);
+    }
+    (matrix, formulas)
+}
+
+/// Enters the answer's formulas through `cell.set`, **after** the engine has evaluated each one. A
+/// formula it cannot enter, or one that names a function the sheet doesn't have, stops the whole
+/// action: no broken formula is ever written.
+fn write_formulas(s: &mut Session, formulas: &[(CellRef, String)]) -> Result<(), EngineError> {
+    for (cell, formula) in formulas {
+        let value = s.execute("formulas.evaluate", json!({ "formula": formula, "cell": cell.a1() }))?;
+        if value.get("error").and_then(Value::as_str) == Some("#NAME?") {
+            return Err(EngineError::Other(format!("the formula in {} uses a function or name the spreadsheet doesn't have", cell.a1())));
+        }
+        s.execute("cell.set", json!({ "cell": cell.a1(), "input": formula }))?;
+    }
+    Ok(())
 }
 
 /// The data cells as `range.setValues` takes them, with text that starts with `=` moved out: the
@@ -844,7 +914,7 @@ mod tests {
         let outcome = Outcome::Sheet {
             title: "Budget".into(),
             columns: vec!["Item".into(), "Cost".into()],
-            rows: vec![vec![json!("Rent"), json!(1200.0)], vec![json!("Food"), json!(400.0)]],
+            rows: vec![vec![Cell::Value(json!("Rent")), Cell::Value(json!(1200.0))], vec![Cell::Value(json!("Food")), Cell::Value(json!(400.0))]],
         };
         assert_eq!(ai.apply(&mut session, &request, Apply::Sheet, outcome), Ok(true));
         assert_eq!(undo_steps(&session), before + 1, "the whole action is one undo step");
@@ -861,13 +931,80 @@ mod tests {
         let mut session = session();
         let mut ai = ai();
         let request = Request::FillColumn { header: "Note".into(), context: String::new(), count: 2 };
-        let outcome = Outcome::Values { values: vec![json!("=SUM(A1:A2)"), json!("plain")] };
+        let outcome = Outcome::Values { values: vec![Cell::Value(json!("=SUM(A1:A2)")), Cell::Value(json!("plain"))] };
         let start = CellRef::new(0, 0);
         let range = range_a1(start, 2);
         assert_eq!(ai.apply(&mut session, &request, Apply::Fill { start, range }, outcome), Ok(true));
         // The command would read a leading `=` as a formula: the text is written as text instead.
         assert_eq!(value(&mut session, "A1"), json!("=SUM(A1:A2)"));
         assert_eq!(value(&mut session, "A2"), json!("plain"));
+    }
+
+    /// The bug of 2026-11-18: a column the model was asked to compute came back as invented numbers.
+    /// Now a formula cell is entered through the engine and the column shows the computed values.
+    #[test]
+    fn a_formula_column_is_written_and_computed() {
+        let mut session = session();
+        let mut ai = ai();
+        session.execute("cell.set", json!({ "cell": "A1", "input": "2" })).unwrap();
+        session.execute("cell.set", json!({ "cell": "B1", "input": "3" })).unwrap();
+        let request = Request::FillColumn { header: "Sum".into(), context: String::new(), count: 1 };
+        let outcome = Outcome::Values { values: vec![Cell::Formula("=A1+B1".into())] };
+        let start = CellRef::new(0, 2);
+        let range = range_a1(start, 1);
+        assert_eq!(ai.apply(&mut session, &request, Apply::Fill { start, range }, outcome), Ok(true));
+        let got = session.execute("cell.get", json!({ "cell": "C1" })).unwrap();
+        assert_eq!(got["formula"], json!("=A1+B1"), "the cell holds the formula, not a number");
+        assert_eq!(got["value"], json!(5.0), "and the engine computed it");
+    }
+
+    #[test]
+    fn a_formula_the_engine_cannot_enter_writes_nothing() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::FillColumn { header: "Sum".into(), context: String::new(), count: 1 };
+        let outcome = Outcome::Values { values: vec![Cell::Formula("=SUM(1;2)".into())] };
+        let start = CellRef::new(0, 0);
+        let range = range_a1(start, 1);
+        let error = ai.apply(&mut session, &request, Apply::Fill { start, range }, outcome).expect_err("refused");
+        assert!(error.contains("problem with this formula"), "{error}");
+        assert_eq!(value(&mut session, "A1"), Value::Null, "the sheet is untouched");
+    }
+
+    /// A name the sheet doesn't know is the other way a model invents a function.
+    #[test]
+    fn a_formula_with_an_unknown_function_writes_nothing() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::FillColumn { header: "Sum".into(), context: String::new(), count: 1 };
+        let outcome = Outcome::Values { values: vec![Cell::Formula("=INVENTED(A1)".into())] };
+        let start = CellRef::new(0, 0);
+        let range = range_a1(start, 1);
+        let error = ai.apply(&mut session, &request, Apply::Fill { start, range }, outcome).expect_err("refused");
+        assert!(error.contains("doesn't have"), "{error}");
+        assert_eq!(value(&mut session, "A1"), Value::Null, "the sheet is untouched");
+    }
+
+    /// The suite's gesture: an engine refusal comes back in the dialog, with the user's own
+    /// parameters, so a retry is one edit away.
+    #[test]
+    fn a_refused_fill_reopens_its_dialog_with_the_reason() {
+        let mut ai = ai();
+        let request = Request::FillColumn { header: "Sum".into(), context: "ctx".into(), count: 3 };
+        let start = CellRef::new(1, 2);
+        let range = range_a1(start, 3);
+        ai.reopen_after_refusal(&request, Apply::Fill { start, range: range.clone() }, "the reason".into());
+        match ai.dialog {
+            Some(Dialog::Fill { header, context, target, start: at, count, error, .. }) => {
+                assert_eq!(header, "Sum");
+                assert_eq!(context, "ctx");
+                assert_eq!(target, range);
+                assert_eq!(at, start);
+                assert_eq!(count, 3);
+                assert_eq!(error.as_deref(), Some("the reason"));
+            }
+            other => panic!("expected the fill dialog, got {:?}", other.is_some()),
+        }
     }
 
     #[test]

@@ -61,3 +61,40 @@ fn connections_opens_the_panel() {
     assert!(h.state().ai.panel, "the connections panel is open");
     assert!(h.query_by_label("Add connection").is_some(), "the panel offers a new connection");
 }
+
+/// The column the model used to invent (bug of 2026-11-18): a formula column is painted as the
+/// values the engine computed, never as the formula text.
+#[test]
+fn a_formula_column_paints_its_computed_values() {
+    use egui::Shape;
+    use localsheets_engine::Session;
+    use serde_json::json;
+
+    let mut session = Session::new();
+    session.new_workbook();
+    session.execute("range.setValues", json!({"range": "A1:C1", "values": [["A", "B", "Soma"]]})).unwrap();
+    session.execute("range.setValues", json!({"range": "A2:B3", "values": [[2, 3], [4, 5]]})).unwrap();
+    session.execute("cell.set", json!({"cell": "C2", "input": "=A2+B2"})).unwrap();
+    session.execute("cell.set", json!({"cell": "C3", "input": "=SUM(A3:B3)"})).unwrap();
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).build_ui_state(
+        |ui, app: &mut SheetApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        SheetApp::new(session, Default::default()),
+    );
+    h.run_steps(4);
+    let painted: Vec<String> = h
+        .output()
+        .shapes
+        .iter()
+        .filter_map(|clipped| match &clipped.shape {
+            Shape::Text(text) => Some(text.galley.job.text.clone()),
+            _ => None,
+        })
+        .collect();
+    assert!(painted.iter().any(|text| text == "5"), "C2 shows the computed 5: {painted:?}");
+    assert!(painted.iter().any(|text| text == "9"), "C3 shows the computed 9: {painted:?}");
+    assert!(!painted.iter().any(|text| text.contains("A2+B2") || text.contains("SUM(A3")), "the formula text never paints: {painted:?}");
+}

@@ -3078,6 +3078,7 @@ name = "localsheets-ai"
 version = "0.2.0"
 dependencies = [
  "local-ai",
+ "localsheets-functions",
  "serde",
  "serde_json",
 ]

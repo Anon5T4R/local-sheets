@@ -19,7 +19,7 @@ pub mod actions;
 pub mod backend;
 pub mod prompts;
 
-pub use actions::{Outcome, Request};
+pub use actions::{Cell, Outcome, Request};
 pub use backend::{Backend, LiveBackend};
 /// The shared client, for the connections panel (presets, keychain and the model list).
 pub use local_ai;

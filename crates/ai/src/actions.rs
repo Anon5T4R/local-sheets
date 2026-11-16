@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::extract_json;
-use crate::prompts::{fill, for_lang};
+use crate::prompts::{ENGINE_FUNCTIONS, fill, for_lang};
 
 /// What the user asked for.
 #[derive(Clone, Debug, PartialEq)]
@@ -23,13 +23,26 @@ pub enum Request {
     Formula { question: String, cell: String, context: String },
 }
 
+/// One cell of an answer: a plain value, or a formula the spreadsheet computes.
+///
+/// Text is **never** read as a formula (a value that starts with `=` is written as text), and a
+/// computed cell is **never** written as an invented number: it is a formula in `f`, which the
+/// window validates with the engine before applying.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Cell {
+    /// A scalar written as typed.
+    Value(Value),
+    /// `=...`, as the model wrote it (a missing `=` is added).
+    Formula(String),
+}
+
 /// What the answer became, ready to apply with engine commands.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
     /// A new sheet: `columns` is the header row, `rows` the data.
-    Sheet { title: String, columns: Vec<String>, rows: Vec<Vec<Value>> },
+    Sheet { title: String, columns: Vec<String>, rows: Vec<Vec<Cell>> },
     /// Values for a column (top to bottom).
-    Values { values: Vec<Value> },
+    Values { values: Vec<Cell> },
     /// One formula, starting with `=`.
     Formula { formula: String },
 }
@@ -64,11 +77,21 @@ pub fn messages(request: &Request, lang: &str) -> Result<Vec<Msg>, String> {
             if topic.is_empty() {
                 return Err("the topic is empty".into());
             }
-            fill(prompts.generate, &[("topic", topic), ("rows", &rows.to_string()), ("answer_in", prompts.answer_in)])
+            fill(
+                prompts.generate,
+                &[("topic", topic), ("rows", &rows.to_string()), ("answer_in", prompts.answer_in), ("functions", ENGINE_FUNCTIONS)],
+            )
         }
-        Request::FillColumn { header, context, count } => {
-            fill(prompts.fill, &[("header", header.trim()), ("context", context), ("count", &count.to_string()), ("answer_in", prompts.answer_in)])
-        }
+        Request::FillColumn { header, context, count } => fill(
+            prompts.fill,
+            &[
+                ("header", header.trim()),
+                ("context", context),
+                ("count", &count.to_string()),
+                ("answer_in", prompts.answer_in),
+                ("functions", ENGINE_FUNCTIONS),
+            ],
+        ),
         Request::Formula { question, cell, context } => {
             let question = question.trim();
             if question.is_empty() {
@@ -99,11 +122,15 @@ pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
                 if row.len() != width {
                     return Err(format!("the model answered row {} with {} values, expected {width}", index + 1, row.len()));
                 }
-                if let Some(bad) = row.iter().position(|value| !is_scalar(value)) {
-                    return Err(format!("the model answered row {} column {} with a nested value", index + 1, bad + 1));
-                }
             }
-            let mut data = sheet.rows;
+            let mut data: Vec<Vec<Cell>> = Vec::with_capacity(sheet.rows.len());
+            for (row_index, row) in sheet.rows.into_iter().enumerate() {
+                let mut line = Vec::with_capacity(width);
+                for (col_index, value) in row.into_iter().enumerate() {
+                    line.push(cell_of(value).map_err(|e| format!("row {} column {}: {e}", row_index + 1, col_index + 1))?);
+                }
+                data.push(line);
+            }
             data.truncate(requested.max(1));
             let title =
                 if sheet.title.trim().is_empty() { topic.trim().chars().take(40).collect() } else { sheet.title.trim().chars().take(40).collect() };
@@ -114,10 +141,10 @@ pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
             if answer.values.is_empty() {
                 return Err("the model did not answer any value".into());
             }
-            if let Some(bad) = answer.values.iter().position(|value| !is_scalar(value)) {
-                return Err(format!("the model answered value {} with a nested value", bad + 1));
+            let mut values: Vec<Cell> = Vec::with_capacity(answer.values.len());
+            for (index, value) in answer.values.into_iter().enumerate() {
+                values.push(cell_of(value).map_err(|e| format!("value {}: {e}", index + 1))?);
             }
-            let mut values = answer.values;
             values.truncate(*count as usize);
             Ok(Outcome::Values { values })
         }
@@ -135,6 +162,27 @@ pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
 /// A cell value the engine's `range.setValues` accepts: a JSON number, string, boolean or null.
 fn is_scalar(value: &Value) -> bool {
     matches!(value, Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_))
+}
+
+/// One cell as the contract allows it: a JSON scalar, `{"v": value}` (written as typed) or
+/// `{"f": "=A2+B2"}` (a formula the engine evaluates). Anything else is refused, so a model cannot
+/// smuggle a nested value into a cell.
+fn cell_of(value: Value) -> Result<Cell, String> {
+    let Value::Object(mut fields) = value else {
+        return if is_scalar(&value) { Ok(Cell::Value(value)) } else { Err("the cell is a nested value".into()) };
+    };
+    if let Some(formula) = fields.remove("f") {
+        let Some(text) = formula.as_str() else { return Err("the cell's `f` is not text".into()) };
+        let formula = text.trim();
+        if formula.is_empty() {
+            return Err("the cell's `f` is empty".into());
+        }
+        return Ok(Cell::Formula(if formula.starts_with('=') { formula.to_string() } else { format!("={formula}") }));
+    }
+    if let Some(value) = fields.remove("v") {
+        return if is_scalar(&value) { Ok(Cell::Value(value)) } else { Err("the cell's `v` is a nested value".into()) };
+    }
+    Err("the cell object has neither `v` nor `f`".into())
 }
 
 #[derive(Deserialize)]
@@ -176,10 +224,51 @@ mod tests {
                 assert_eq!(title, "Medicamentos");
                 assert_eq!(columns, ["Nome", "Dose"]);
                 assert_eq!(rows.len(), 2);
-                assert_eq!(rows[0], vec![Value::String("A".into()), Value::from(1)]);
+                assert_eq!(rows[0], vec![Cell::Value(Value::String("A".into())), Cell::Value(Value::from(1))]);
             }
             other => panic!("expected a sheet, got {other:?}"),
         }
+    }
+
+    /// The computed cells the model is now asked for: `{"f": ...}` becomes a formula, and the text
+    /// it is written as is exactly what the engine will parse.
+    #[test]
+    fn a_formula_cell_becomes_a_formula() {
+        let answer = r#"{"columns":["A","B","Soma"],"rows":[[2,3,{"f":"=A2+B2"}]]}"#;
+        match interpret(&generate(), answer).expect("a sheet") {
+            Outcome::Sheet { rows, .. } => {
+                assert_eq!(rows[0][0], Cell::Value(Value::from(2)));
+                assert_eq!(rows[0][2], Cell::Formula("=A2+B2".into()));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// `{"v": ...}` is a plain value, and a `v` that starts with `=` stays **text**: the anti-sorcery
+    /// rule is unchanged, only the formula channel is new.
+    #[test]
+    fn a_plain_value_stays_text_even_with_a_leading_equals() {
+        let answer = r#"{"columns":["A"],"rows":[[{"v":"=A2+B2"}]]}"#;
+        match interpret(&generate(), answer).expect("a sheet") {
+            Outcome::Sheet { rows, .. } => assert_eq!(rows[0][0], Cell::Value(Value::String("=A2+B2".into()))),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_formula_cell_without_the_equals_gets_it() {
+        let answer = r#"{"columns":["A"],"rows":[[{"f":"A2+1"}]]}"#;
+        match interpret(&generate(), answer).expect("a sheet") {
+            Outcome::Sheet { rows, .. } => assert_eq!(rows[0][0], Cell::Formula("=A2+1".into())),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_cell_object_with_neither_key_is_refused_with_its_place() {
+        let answer = r#"{"columns":["A"],"rows":[[{"x":1}]]}"#;
+        let error = interpret(&generate(), answer).expect_err("no v/f");
+        assert!(error.contains("row 1 column 1") && error.contains("`v`"), "{error}");
     }
 
     /// A reasoning block and a markdown fence are the extractor's problem, not this action's.
@@ -200,7 +289,7 @@ mod tests {
 
     #[test]
     fn a_nested_cell_value_is_refused() {
-        let answer = r#"{"columns":["A"],"rows":[[{"x":1}]]}"#;
+        let answer = r#"{"columns":["A"],"rows":[[{"v":[1,2]}]]}"#;
         let error = interpret(&generate(), answer).expect_err("nested");
         assert!(error.contains("nested"), "{error}");
     }
@@ -217,9 +306,11 @@ mod tests {
     #[test]
     fn fill_values_are_taken_in_order_and_capped_at_the_count() {
         let request = Request::FillColumn { header: "Dose".into(), context: String::new(), count: 2 };
-        let answer = r#"{"values":["1 mg","2 mg","3 mg"]}"#;
+        let answer = r#"{"values":["1 mg",{"f":"=B2*2"},"3 mg"]}"#;
         match interpret(&request, answer).expect("values") {
-            Outcome::Values { values } => assert_eq!(values, vec![Value::String("1 mg".into()), Value::String("2 mg".into())]),
+            Outcome::Values { values } => {
+                assert_eq!(values, vec![Cell::Value(Value::String("1 mg".into())), Cell::Formula("=B2*2".into())]);
+            }
             other => panic!("{other:?}"),
         }
     }
