@@ -75,7 +75,7 @@ fn a_streamed_sheet_answer_becomes_an_outcome() {
             .expect("the streamed answer arrives");
     assert_eq!(pieces, json, "the deltas arrive in order");
 
-    let request = localsheets_ai::Request::GenerateSheet { topic: "medicamentos".into(), rows: 5 };
+    let request = localsheets_ai::Request::GenerateSheet { topic: "medicamentos".into(), rows: 5, language: "português".into() };
     match localsheets_ai::actions::interpret(&request, &answer).expect("the answer is a sheet") {
         localsheets_ai::Outcome::Sheet { title, columns, rows, .. } => {
             assert_eq!(title, "Medicamentos");
@@ -102,7 +102,7 @@ fn a_streamed_formula_cell_keeps_its_channel() {
     });
     let answer = local_ai::chat_stream_with_key(&app(), &connection(port), "", &[Msg::User("soma".into())], &mut |_: &str| {})
         .expect("the streamed answer arrives");
-    let request = localsheets_ai::Request::GenerateSheet { topic: "soma".into(), rows: 2 };
+    let request = localsheets_ai::Request::GenerateSheet { topic: "soma".into(), rows: 2, language: "português".into() };
     let outcome = localsheets_ai::actions::interpret(&request, &answer).expect("a sheet");
     match outcome {
         localsheets_ai::Outcome::Sheet { rows, .. } => {

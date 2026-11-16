@@ -31,13 +31,13 @@ enum Event {
 #[derive(Clone)]
 pub(crate) enum Apply {
     /// A new sheet (the outcome carries the cells), and the look the user picked for it.
-    Sheet { preset: Preset },
+    Sheet { preset: Preset, currency: &'static str },
     /// The target column: where it starts and the A1 range the values go into.
     Fill { start: CellRef, range: String },
     /// The cell the formula goes into.
     Formula { cell: CellRef },
     /// An existing table, formatted with the classifier's roles and the user's preset.
-    Table { start: CellRef, end: CellRef, preset: Preset },
+    Table { start: CellRef, end: CellRef, preset: Preset, currency: &'static str },
 }
 
 /// The last generate the user ran, so its dialog opens pre-filled (the suite's "repeat" gesture).
@@ -179,7 +179,7 @@ impl Ai {
         };
         let messages = localsheets_ai::actions::messages(&request, lang)?;
         // Remember the request, so the dialog can come back pre-filled (repeat).
-        if let (Request::GenerateSheet { topic, rows }, Apply::Sheet { preset }) = (&request, &apply) {
+        if let (Request::GenerateSheet { topic, rows, .. }, Apply::Sheet { preset, .. }) = (&request, &apply) {
             self.last = Some(LastGenerate { topic: topic.clone(), rows: *rows, preset: *preset });
         }
         let (tx, rx) = mpsc::channel();
@@ -272,7 +272,7 @@ impl Ai {
     /// answers in its own dialog). The reason goes into the dialog, not the strip.
     fn reopen_after_refusal(&mut self, request: &Request, apply: Apply, error: String) {
         self.dialog = match (request, apply) {
-            (Request::GenerateSheet { topic, rows }, Apply::Sheet { preset }) => {
+            (Request::GenerateSheet { topic, rows, .. }, Apply::Sheet { preset, .. }) => {
                 Some(Dialog::Generate { topic: topic.clone(), rows: *rows, preset, error: Some(error) })
             }
             (Request::FillColumn { header, context, count }, Apply::Fill { start, range }) => Some(Dialog::Fill {
@@ -312,7 +312,7 @@ impl Ai {
     /// group rolled back and the message belongs in the strip.
     fn apply(&mut self, session: &mut Session, request: &Request, target: Apply, outcome: Outcome) -> Result<bool, String> {
         match (request, target, outcome) {
-            (Request::GenerateSheet { .. }, Apply::Sheet { preset }, Outcome::Sheet { title, columns, rows, total_row }) => {
+            (Request::GenerateSheet { .. }, Apply::Sheet { preset, currency }, Outcome::Sheet { title, columns, rows, total_row }) => {
                 let width = columns.len();
                 let kinds: Vec<Kind> = columns.iter().map(|column| column.kind).collect();
                 let data_rows = rows.len();
@@ -337,22 +337,22 @@ impl Ai {
                             s.execute("cell.set", json!({ "sheet": index, "cell": cell.a1(), "input": format!("'{text}") }))?;
                         }
                         write_formulas(s, &formulas)?;
-                        apply_preset(
-                            s,
-                            preset,
-                            &TableShape { start: CellRef::new(0, 0), width, rows: 1 + data_rows, kinds, total_row, header: true },
-                        )?;
+                        let shape = TableShape { start: CellRef::new(0, 0), width, rows: 1 + data_rows, kinds, total_row, header: true };
+                        // The arithmetic is the app's: a model may answer numbers where formulas
+                        // belong, and a totals row that does not move is worse than none.
+                        derive_computed(s, &shape)?;
+                        apply_preset(s, preset, &shape, currency)?;
                         Ok(())
                     })
                     .map_err(|e| e.to_string())?;
                 Ok(true)
             }
-            (Request::ClassifyTable { .. }, Apply::Table { start, end, preset }, Outcome::Table { columns, total_row }) => {
+            (Request::ClassifyTable { .. }, Apply::Table { start, end, preset, currency }, Outcome::Table { columns, total_row }) => {
                 let width = end.col.saturating_sub(start.col) as usize + 1;
                 let rows = end.row.saturating_sub(start.row) as usize + 1;
                 session
                     .grouped("AI: format table", |s| {
-                        apply_preset(s, preset, &TableShape { start, width, rows, kinds: columns, total_row, header: true })
+                        apply_preset(s, preset, &TableShape { start, width, rows, kinds: columns, total_row, header: true }, currency)
                     })
                     .map_err(|e| e.to_string())?;
                 Ok(true)
@@ -594,6 +594,29 @@ impl TableShape {
         RangeRef { start, end }.a1()
     }
 
+    /// The A1 range of every column the table spans (`A:C`), for the autofit.
+    fn columns_range(&self) -> String {
+        let last = self.start.col + self.width.saturating_sub(1) as u32;
+        RangeRef::cols(self.start.col, last).a1()
+    }
+
+    /// Whether the last row is a totals row: `last_row: "total"` says so, and so does a first cell
+    /// that starts with "total" (the suite's three languages), so a model that forgot the
+    /// annotation still gets the emphasis.
+    fn total_is_row(&self, s: &Session) -> bool {
+        if self.total_row {
+            return true;
+        }
+        if self.rows < 2 {
+            return false;
+        }
+        let Some(at) = self.start.offset(self.rows as i64 - 1, 0) else { return false };
+        let Some(doc) = s.active() else { return false };
+        let Some(sheet) = doc.wb.sheet(doc.wb.active_sheet()) else { return false };
+        let text = sheet.input_text(at).trim().to_lowercase();
+        ["total", "subtotal", "合計", "合计", "total general", "custo total"].iter().any(|prefix| text.starts_with(prefix))
+    }
+
     /// The A1 range of one data column, below the header.
     fn column_range(&self, index: usize) -> Option<String> {
         let first = if self.header { 1 } else { 0 };
@@ -612,7 +635,7 @@ const HEADER_FILL: &str = "#DDEBF7";
 
 /// Applies the look the user picked. Style is the app's: the answer only says what each column
 /// holds (a closed vocabulary) and whether the last row totals.
-fn apply_preset(s: &mut Session, preset: Preset, shape: &TableShape) -> Result<(), EngineError> {
+fn apply_preset(s: &mut Session, preset: Preset, shape: &TableShape, currency: &str) -> Result<(), EngineError> {
     if preset == Preset::None {
         return Ok(());
     }
@@ -625,30 +648,106 @@ fn apply_preset(s: &mut Session, preset: Preset, shape: &TableShape) -> Result<(
     }
     if preset != Preset::Raw {
         for (index, kind) in shape.kinds.iter().enumerate().take(shape.width) {
-            let (Some(mut params), Some(range)) = (number_format(*kind), shape.column_range(index)) else { continue };
-            params["range"] = json!(range);
-            s.execute("home.numberFormat", params)?;
+            let Some(range) = shape.column_range(index) else { continue };
+            apply_number_format(s, *kind, &range, currency)?;
         }
     }
-    if shape.total_row && preset != Preset::Raw {
-        s.execute("home.borders", json!({ "range": shape.last_row_range(), "preset": "top", "style": "thin" }))?;
+    // The totals row is set apart: bold, a band, and a rule above it. `last_row` says so; a title
+    // that starts with "total" does too, so a model that forgot the annotation still gets it.
+    if preset != Preset::Raw && shape.total_is_row(s) {
+        let range = shape.last_row_range();
+        s.execute("home.formatCells", json!({ "range": range, "style": { "font": { "bold": true } } }))?;
+        s.execute("home.fillColor", json!({ "range": range, "color": HEADER_FILL }))?;
+        s.execute("home.borders", json!({ "range": range, "preset": "top", "style": "thin" }))?;
     }
     if preset == Preset::Table {
         s.execute("home.formatAsTable", json!({ "range": shape.range(), "style": "TableStyleMedium2", "header": shape.header }))?;
     }
-    s.execute("home.autofitColumnWidth", json!({}))?;
+    // Autofit **last**, over the table's own columns: it measures the displayed text, so it has to
+    // see the number formats (a currency wider than its number) and the evaluated formulas.
+    s.execute("home.autofitColumnWidth", json!({ "cols": shape.columns_range() }))?;
     Ok(())
 }
 
-/// The number format a kind asks for. The kind is the model's label; the format is ours.
-fn number_format(kind: Kind) -> Option<Value> {
-    match kind {
-        Kind::Text => None,
-        Kind::Currency => Some(json!({ "format": "Currency" })),
-        Kind::Percent => Some(json!({ "format": "Percentage" })),
-        Kind::Date => Some(json!({ "format": "Short Date" })),
-        Kind::Month => Some(json!({ "code": "mmm yyyy" })),
+/// The currency symbol the interface language uses in the financial preset (a preset is the app's
+/// look: the model never names a symbol).
+fn currency_symbol(language: crate::i18n::Language) -> &'static str {
+    match language {
+        crate::i18n::Language::PtBr => "R$",
+        crate::i18n::Language::Es => "€",
+        crate::i18n::Language::Ja => "¥",
+        _ => "$",
     }
+}
+
+/// Applies the number format a kind asks for. The kind is the model's label; the format is ours,
+/// and the currency symbol follows the interface language.
+fn apply_number_format(s: &mut Session, kind: Kind, range: &str, currency: &str) -> Result<(), EngineError> {
+    match kind {
+        Kind::Text => Ok(()),
+        // `home.accounting` is the one command that takes a symbol: the built-in "Currency" format
+        // is always the dollar, whatever the interface language.
+        Kind::Currency => s.execute("home.accounting", json!({ "range": range, "symbol": currency })).map(|_| ()),
+        Kind::Percent => s.execute("home.numberFormat", json!({ "range": range, "format": "Percentage" })).map(|_| ()),
+        Kind::Date => s.execute("home.numberFormat", json!({ "range": range, "format": "Short Date" })).map(|_| ()),
+        Kind::Month => s.execute("home.numberFormat", json!({ "range": range, "code": "mmm yyyy" })).map(|_| ()),
+    }
+}
+
+/// The arithmetic the model is asked for but often skips, derived by the app: a totals row that
+/// sums its own column, and (when a value column sits before it) a share of the total. Every cell
+/// written here is a formula the engine validates, so editing a value moves the totals - a weak
+/// model can be wrong about a number, but not about the sheet's arithmetic.
+fn derive_computed(s: &mut Session, shape: &TableShape) -> Result<(), EngineError> {
+    if shape.rows < 2 {
+        return Ok(());
+    }
+    let numeric: Vec<usize> = shape
+        .kinds
+        .iter()
+        .take(shape.width)
+        .enumerate()
+        .filter(|(_, kind)| matches!(kind, Kind::Currency | Kind::Percent))
+        .map(|(index, _)| index)
+        .collect();
+    let has_formula = |s: &mut Session, at: CellRef| s.execute("cell.get", json!({ "cell": at.a1() })).unwrap_or_default()["formula"].is_string();
+    // 1. A totals row sums its own column, over every data row above it.
+    if numeric.is_empty() || !shape.total_is_row(s) {
+        return Ok(());
+    }
+    for &col in &numeric {
+        let (Some(cell), Some(first), Some(last)) = (
+            shape.start.offset((shape.rows - 1) as i64, col as i64),
+            shape.start.offset(1, col as i64),
+            shape.start.offset((shape.rows - 2) as i64, col as i64),
+        ) else {
+            continue;
+        };
+        if has_formula(s, cell) {
+            continue;
+        }
+        s.execute("cell.set", json!({ "cell": cell.a1(), "input": format!("=SUM({}:{})", first.a1(), last.a1()) }))?;
+    }
+    // 2. A percent column derives its shares from the value column before it: =E2/E$21, the row
+    //    absolute, so the column adds up to the 100% total.
+    let Some(base) = shape.kinds.iter().take(shape.width).position(|kind| *kind == Kind::Currency) else { return Ok(()) };
+    let Some(value_total) = shape.start.offset((shape.rows - 1) as i64, base as i64) else { return Ok(()) };
+    let letters: String = value_total.a1().chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+    for (index, kind) in shape.kinds.iter().take(shape.width).enumerate() {
+        if *kind != Kind::Percent || index <= base {
+            continue;
+        }
+        for row in 1..shape.rows - 1 {
+            let (Some(cell), Some(source)) = (shape.start.offset(row as i64, index as i64), shape.start.offset(row as i64, base as i64)) else {
+                continue;
+            };
+            if has_formula(s, cell) {
+                continue;
+            }
+            s.execute("cell.set", json!({ "cell": cell.a1(), "input": format!("={}/{letters}${}", source.a1(), value_total.row + 1) }))?;
+        }
+    }
+    Ok(())
 }
 
 /// The selected table as the classifier needs it: its range, the header row and a text sample.
@@ -973,7 +1072,10 @@ fn dialog_window(app: &mut SheetApp, ctx: &Context) {
                 }
                 ui.horizontal(|ui| {
                     if ui.button(language.tr("Generate")).clicked() {
-                        run = Some((Request::GenerateSheet { topic: topic.clone(), rows: *rows }, Apply::Sheet { preset: *preset }));
+                        run = Some((
+                            Request::GenerateSheet { topic: topic.clone(), rows: *rows, language: language.name().to_string() },
+                            Apply::Sheet { preset: *preset, currency: currency_symbol(language) },
+                        ));
                     }
                     if ui.button(language.tr("Cancel")).clicked() {
                         close = true;
@@ -996,7 +1098,7 @@ fn dialog_window(app: &mut SheetApp, ctx: &Context) {
                     if ui.button(language.tr("Apply")).clicked() {
                         run = Some((
                             Request::ClassifyTable { range: range.clone(), header: header.clone(), sample: sample.clone() },
-                            Apply::Table { start: *start, end: *end, preset: *preset },
+                            Apply::Table { start: *start, end: *end, preset: *preset, currency: currency_symbol(language) },
                         ));
                     }
                     if ui.button(language.tr("Cancel")).clicked() {
@@ -1149,19 +1251,226 @@ mod tests {
         session.active().map_or(0, |doc| doc.undo.len())
     }
 
+    /// v0.2.3: the currency follows the interface language (R$ for pt-BR), never a fixed "$".
+    #[test]
+    fn the_currency_follows_the_interface_language() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Controle".into(), rows: 1, language: "Português (Brasil)".into() };
+        let outcome = Outcome::Sheet {
+            title: "Controle".into(),
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Custo".into(), kind: Kind::Currency }],
+            rows: vec![vec![Cell::Value(json!("Aluguel")), Cell::Value(json!(1234.5))]],
+            total_row: false,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "R$" }, outcome), Ok(true));
+        let b2 = session.execute("cell.get", json!({ "cell": "B2" })).unwrap();
+        let fmt = b2["style"]["num_fmt"].as_str().unwrap_or_default();
+        assert!(fmt.contains("R$"), "the Brazilian currency is in the format: {fmt}");
+    }
+
+    /// v0.2.3: the autofit runs **after** the number formats, over the table's own columns, so the
+    /// formatted value fits instead of painting `####`.
+    #[test]
+    fn the_autofit_accounts_for_the_currency_format() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Controle".into(), rows: 1, language: "English".into() };
+        let outcome = Outcome::Sheet {
+            title: "Controle".into(),
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Custo".into(), kind: Kind::Currency }],
+            rows: vec![vec![Cell::Value(json!("Rent")), Cell::Value(json!(1234567.89))]],
+            total_row: false,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "$" }, outcome), Ok(true));
+        let doc = session.active().unwrap();
+        let sheet = doc.wb.sheet(doc.wb.active_sheet()).unwrap();
+        let width = sheet.cols.get(&1).and_then(|entry| entry.size).unwrap_or(0.0);
+        // "$1,234,567.89" at the default face is ~90 px; the default column is 64.
+        assert!(width > 90.0, "the currency column fits its formatted value: {width}");
+        let header = sheet.cols.get(&0).and_then(|entry| entry.size).unwrap_or(0.0);
+        assert!(header > 0.0, "the text column was measured too: {header}");
+    }
+
+    /// v0.2.3: a totals row is a **live** formula over the data above it, so editing a value moves
+    /// the total (the bug: the model answered a computed number, or a range that missed the last row).
+    #[test]
+    fn the_totals_row_is_a_live_formula() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Controle".into(), rows: 3, language: "English".into() };
+        let outcome = Outcome::Sheet {
+            title: "Controle".into(),
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
+            rows: vec![
+                vec![Cell::Value(json!("Rent")), Cell::Value(json!(100.0))],
+                vec![Cell::Value(json!("Food")), Cell::Value(json!(50.0))],
+                vec![Cell::Value(json!("Total")), Cell::Formula("=SUM(B2:B3)".into())],
+            ],
+            total_row: true,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "$" }, outcome), Ok(true));
+        assert_eq!(value(&mut session, "B4"), json!(150.0), "the total is computed");
+        // Editing a value in the middle moves the total: it is a formula, not a number.
+        session.execute("cell.set", json!({ "cell": "B2", "input": "250" })).unwrap();
+        assert_eq!(value(&mut session, "B4"), json!(300.0), "the total follows the edit");
+        // And the totals row is set apart: bold, a band and a rule above it.
+        let b4 = session.execute("cell.get", json!({ "cell": "B4" })).unwrap();
+        assert_eq!(b4["style"]["font"]["bold"], json!(true), "totals row bold: {}", b4["style"]);
+        assert!(!b4["style"]["borders"]["top"].is_null(), "totals row rule: {}", b4["style"]);
+        let fill = &b4["style"]["fill"];
+        assert!(!fill.is_null() && *fill != json!("none"), "totals row band: {fill}");
+    }
+
+    /// The totals row is also recognised when the model forgot `last_row` but titled the row "Total".
+    #[test]
+    fn a_totals_row_titled_total_is_set_apart_without_the_annotation() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Controle".into(), rows: 2, language: "English".into() };
+        let outcome = Outcome::Sheet {
+            title: "Controle".into(),
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
+            rows: vec![
+                vec![Cell::Value(json!("Rent")), Cell::Value(json!(100.0))],
+                vec![Cell::Value(json!("Total")), Cell::Formula("=SUM(B2:B2)".into())],
+            ],
+            total_row: false,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "$" }, outcome), Ok(true));
+        let a3 = session.execute("cell.get", json!({ "cell": "A3" })).unwrap();
+        assert_eq!(a3["style"]["font"]["bold"], json!(true), "the titled total row is bold: {}", a3["style"]);
+    }
+
+    /// The real-model end-to-end: network + key, so `#[ignore]`. Run by hand (the key comes from
+    /// `OPENROUTER_API_KEY` or from `C:\Users\Hades\Desktop\ai-test.env`; a free model works with a
+    /// zero-credit key):
+    /// `AI_TEST_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free cargo test -p localsheets-ui-egui ai::tests::a_real_model -- --ignored --nocapture`
+    #[test]
+    #[ignore = "network + a real provider key"]
+    fn a_real_model_builds_a_live_financial_table() {
+        let key = real_key();
+        let connection = local_ai::Connection {
+            id: "real".into(),
+            provider: "openrouter".into(),
+            label: "OpenRouter".into(),
+            base_url: String::new(),
+            model: std::env::var("AI_TEST_MODEL").unwrap_or_else(|_| "openai/gpt-4o-mini".into()),
+        };
+        let request = Request::GenerateSheet {
+            topic: "Controle financeiro pessoal com somatórias que mudam quando muda o valor".into(),
+            rows: 19,
+            language: "Português (Brasil)".into(),
+        };
+        let messages = localsheets_ai::actions::messages(&request, "pt-br").expect("messages");
+        let app = localsheets_ai::local_ai::App { id: AI_APP_ID, url: AI_APP_URL };
+        let mut on_delta = |_: &str| {};
+        let answer = localsheets_ai::local_ai::chat_stream_with_key(&app, &connection, &key, &messages, &mut on_delta).expect("a real answer");
+        println!("--- answer ---\n{answer}\n--------------");
+        let outcome = localsheets_ai::actions::interpret(&request, &answer).expect("the answer fits the contract");
+        if let Outcome::Sheet { columns, rows, .. } = &outcome {
+            println!("columns: {:?}", columns.iter().map(|column| (column.title.as_str(), column.kind)).collect::<Vec<_>>());
+            println!("rows: {}", rows.len());
+        }
+        let mut session = session();
+        let mut ai = ai();
+        assert_eq!(
+            ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "R$" }, outcome.clone()),
+            Ok(true),
+            "the answer applies"
+        );
+        let Outcome::Sheet { columns, rows, total_row, .. } = &outcome else { panic!("a sheet") };
+        let last = rows.len() as u32; // 0-based row of the last data row (A1 row = last + 1)
+        let numeric: Vec<usize> =
+            columns.iter().enumerate().filter(|(_, c)| matches!(c.kind, Kind::Currency | Kind::Percent)).map(|(i, _)| i).collect();
+        assert!(!numeric.is_empty(), "the table has numeric columns: {columns:?}");
+        if *total_row {
+            // The totals row is live for every numeric column, from the model or derived.
+            for &col in &numeric {
+                let at = CellRef::new(last, col as u32);
+                let got = session.execute("cell.get", json!({ "cell": at.a1() })).unwrap();
+                assert!(got["formula"].is_string(), "{} is a live total: {got}", at.a1());
+            }
+            // Editing a value above it moves that column's total.
+            let col = numeric[0];
+            let first = CellRef::new(2, col as u32);
+            session.execute("cell.set", json!({ "cell": first.a1(), "input": "123456" })).unwrap();
+            let total = session.execute("cell.get", json!({ "cell": CellRef::new(last, col as u32).a1() })).unwrap();
+            println!("{} after the edit: {}", CellRef::new(last, col as u32).a1(), total["value"]);
+            assert_ne!(total["value"], json!(0.0), "the total is computed from the data: {total}");
+        }
+        // The currency is the Brazilian one (the interface asked for Português (Brasil)).
+        let col = numeric[0];
+        let b = session.execute("cell.get", json!({ "cell": CellRef::new(2, col as u32).a1() })).unwrap();
+        let fmt = b["style"]["num_fmt"].as_str().unwrap_or_default();
+        assert!(fmt.contains("R$"), "the format is Brazilian: {fmt}");
+    }
+
+    /// The key the ignored real-model test uses: the environment first, then the suite's
+    /// `ai-test.env` on the Desktop (never printed).
+    fn real_key() -> String {
+        if let Ok(key) = std::env::var("OPENROUTER_API_KEY")
+            && !key.trim().is_empty()
+        {
+            return key;
+        }
+        let path = std::path::Path::new(r"C:\Users\Hades\Desktop\ai-test.env");
+        let text = std::fs::read_to_string(path).expect("ai-test.env on the Desktop");
+        text.lines()
+            .filter_map(|line| line.split_once('='))
+            .find(|(name, _)| name.trim() == "OPENROUTER_API_KEY")
+            .map(|(_, value)| value.trim().trim_matches('"').to_string())
+            .filter(|value| !value.is_empty())
+            .expect("OPENROUTER_API_KEY in ai-test.env")
+    }
+
+    /// v0.2.3, the real fix for a weak model: the totals row and the shares are **derived by the
+    /// app** as formulas when the answer carries plain numbers, so editing a value moves them.
+    #[test]
+    fn a_model_that_answers_numbers_still_gets_live_totals_and_shares() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Controle".into(), rows: 3, language: "English".into() };
+        let outcome = Outcome::Sheet {
+            title: "Controle".into(),
+            columns: vec![
+                Column { title: "Item".into(), kind: Kind::Text },
+                Column { title: "Cost".into(), kind: Kind::Currency },
+                Column { title: "Share".into(), kind: Kind::Percent },
+            ],
+            rows: vec![
+                vec![Cell::Value(json!("Rent")), Cell::Value(json!(100.0)), Cell::Value(json!(0.25))],
+                vec![Cell::Value(json!("Food")), Cell::Value(json!(50.0)), Cell::Value(json!(0.125))],
+                vec![Cell::Value(json!("Total")), Cell::Value(json!(150.0)), Cell::Value(json!(0.375))],
+            ],
+            total_row: true,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "$" }, outcome), Ok(true));
+        // The totals row is a SUM over the data rows; the shares divide by the value total.
+        assert_eq!(session.execute("cell.get", json!({ "cell": "B4" })).unwrap()["formula"], json!("=SUM(B2:B3)"));
+        assert_eq!(session.execute("cell.get", json!({ "cell": "C2" })).unwrap()["formula"], json!("=B2/B$4"));
+        assert_eq!(session.execute("cell.get", json!({ "cell": "C4" })).unwrap()["formula"], json!("=SUM(C2:C3)"));
+        assert_eq!(value(&mut session, "B4"), json!(150.0));
+        assert_eq!(value(&mut session, "C4"), json!(1.0), "the shares add up to the 100% total");
+        // Editing a value moves the total and the share that reads it.
+        session.execute("cell.set", json!({ "cell": "B2", "input": "300" })).unwrap();
+        assert_eq!(value(&mut session, "B4"), json!(350.0), "the total follows the edit");
+        assert_eq!(value(&mut session, "C2"), json!(300.0 / 350.0), "the share follows the total");
+    }
+
     #[test]
     fn a_generated_sheet_lands_in_a_new_sheet_in_one_undo_step() {
         let mut session = session();
         let before = undo_steps(&session);
         let mut ai = ai();
-        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2 };
+        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2, language: "English".into() };
         let outcome = Outcome::Sheet {
             title: "Budget".into(),
             columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
             rows: vec![vec![Cell::Value(json!("Rent")), Cell::Value(json!(1200.0))], vec![Cell::Value(json!("Food")), Cell::Value(json!(400.0))]],
             total_row: false,
         };
-        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::None }, outcome), Ok(true));
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::None, currency: "$" }, outcome), Ok(true));
         assert_eq!(undo_steps(&session), before + 1, "the whole action is one undo step");
         assert_eq!(value(&mut session, "A1"), json!("Item"));
         assert_eq!(value(&mut session, "B1"), json!("Cost"));
@@ -1236,7 +1545,7 @@ mod tests {
     fn a_financial_preset_formats_the_answer() {
         let mut session = session();
         let mut ai = ai();
-        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2 };
+        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2, language: "English".into() };
         let outcome = Outcome::Sheet {
             title: "Budget".into(),
             columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
@@ -1246,7 +1555,7 @@ mod tests {
             ],
             total_row: true,
         };
-        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial }, outcome), Ok(true));
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial, currency: "R$" }, outcome), Ok(true));
         let a1 = session.execute("cell.get", json!({ "cell": "A1" })).unwrap();
         assert_eq!(a1["style"]["font"]["bold"], json!(true), "header band: {}", a1["style"]);
         let b2 = session.execute("cell.get", json!({ "cell": "B2" })).unwrap();
@@ -1265,7 +1574,7 @@ mod tests {
         let mut ai = ai();
         let request = Request::ClassifyTable { range: "A1:C3".into(), header: String::new(), sample: String::new() };
         let outcome = Outcome::Table { columns: vec![Kind::Text, Kind::Currency, Kind::Percent], total_row: true };
-        let apply = Apply::Table { start: CellRef::new(0, 0), end: CellRef::new(2, 2), preset: Preset::Financial };
+        let apply = Apply::Table { start: CellRef::new(0, 0), end: CellRef::new(2, 2), preset: Preset::Financial, currency: "R$" };
         assert_eq!(ai.apply(&mut session, &request, apply, outcome), Ok(true));
         assert_eq!(value(&mut session, "B2"), json!(1200.0), "no value is rewritten");
         assert_eq!(value(&mut session, "C2"), json!(0.5));
@@ -1353,14 +1662,14 @@ mod tests {
             base_url: "http://127.0.0.1:9".into(),
             model: "m".into(),
         };
-        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 4 };
+        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 4, language: "English".into() };
         let messages = localsheets_ai::actions::messages(&request, "en").unwrap();
         let mut pieces = String::new();
         let answer = backend.stream(&connection, &messages, &mut |piece| pieces.push_str(piece)).unwrap();
         assert_eq!(pieces, answer);
         let outcome = localsheets_ai::actions::interpret(&request, &answer).unwrap();
         let mut session = session();
-        assert_eq!(ai().apply(&mut session, &request, Apply::Sheet { preset: Preset::None }, outcome), Ok(true));
+        assert_eq!(ai().apply(&mut session, &request, Apply::Sheet { preset: Preset::None, currency: "$" }, outcome), Ok(true));
         assert_eq!(value(&mut session, "A2"), json!("Rent"));
     }
 }

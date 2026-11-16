@@ -79,23 +79,25 @@ static EN: Prompts = Prompts {
     system: "You are a spreadsheet assistant. Answer in {answer_in}. Return only the JSON object \
              described: no prose, no markdown, no code fences.",
     answer_in: "English",
-    generate: "Build a spreadsheet about: {topic}\n\n\
+    generate: "Build a spreadsheet about: {topic}\n\
+               Write every text in it (headers, items, notes) in {language}.\n\n\
                Return one JSON object with exactly this shape:\n\
                {{\"title\": \"a short sheet title\", \"columns\": [{{\"title\": \"Item\", \"kind\": \"text\"}}, {{\"title\": \"Cost\", \"kind\": \"currency\"}}], \"rows\": [[\"text\", 1], [\"text\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Rules:\n\
-               - exactly {rows} data rows (not counting the header);\n\
+               - exactly {rows} data rows (not counting the header; a totals row is one of them);\n\
                - every row has one cell per column, in the same order as \"columns\";\n\
                - every column is an object with its \"title\" and its \"kind\": text, currency, percent, date or month;\n\
                - the header is row 1, so the first data row is row 2 (a formula there references row 2);\n\
                - a cell is a JSON value (text, number, true/false) or an object with one key: \
                {{\"v\": value}} is a plain value written as typed (text is never read as a formula), \
                and {{\"f\": \"=B2*2\"}} is a formula the sheet computes;\n\
-               - a cell computed from other cells MUST be a formula in \"f\" (for example =B2*C2, =SUM(B2:B30), \
-               =SUMIF(A2:A30,\"Rent\",B2:B30)); never write a computed number by hand;\n\
-               - a last row that sums or aggregates the rows above is a data row too (formulas), and you say so \
-               with \"last_row\": \"total\"; omit \"last_row\" otherwise;\n\
+               - EVERY computed cell MUST be a formula in \"f\": a line total (=B2*C2), a column total \
+               (=SUM(B2:B20)), a share of a total (=E2/E$21, the row absolute). Never write a computed number;\n\
+               - a totals row is a data row of formulas, and you say so with \"last_row\": \"total\";\n\
+               - amounts are positive numbers; a direction or flow column says whether a row is income or \
+               expense, so never write a negative amount unless the column itself is a net or a balance;\n\
                - formulas use English function names and a comma between arguments; the engine has: {functions};\n\
-               - the content is in {answer_in}.",
+               - the content is in {language}.",
     fill: "Fill the column \"{header}\" with {count} cells, continuing the table.\n\n\
            Existing data (header and some rows):\n{context}\n\n\
            Return one JSON object with exactly this shape:\n\
@@ -129,23 +131,25 @@ static PT: Prompts = Prompts {
     system: "Você é um assistente de planilhas. Responda em {answer_in}. Devolva apenas o objeto \
              JSON descrito: sem prosa, sem markdown, sem cercas de código.",
     answer_in: "português (Brasil)",
-    generate: "Monte uma planilha sobre: {topic}\n\n\
+    generate: "Monte uma planilha sobre: {topic}\n\
+               Escreva todo o texto dela (cabeçalhos, itens, notas) em {language}.\n\n\
                Devolva um objeto JSON exatamente com esta forma:\n\
                {{\"title\": \"um título curto\", \"columns\": [{{\"title\": \"Item\", \"kind\": \"text\"}}, {{\"title\": \"Custo\", \"kind\": \"currency\"}}], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Regras:\n\
-               - exatamente {rows} linhas de dados (sem contar o cabeçalho);\n\
+               - exatamente {rows} linhas de dados (sem contar o cabeçalho; uma linha de total conta);\n\
                - cada linha tem uma célula por coluna, na mesma ordem de \"columns\";\n\
                - cada coluna é um objeto com \"title\" e \"kind\": text, currency, percent, date ou month;\n\
                - o cabeçalho é a linha 1, então a primeira linha de dados é a 2 (uma fórmula ali referencia a linha 2);\n\
                - uma célula é um valor JSON (texto, número, true/false) ou um objeto com uma chave: \
                {{\"v\": valor}} é um valor simples escrito como está (texto nunca é lido como fórmula) e \
                {{\"f\": \"=B2*2\"}} é uma fórmula que a planilha calcula;\n\
-               - uma célula calculada a partir de outras células PRECISA ser uma fórmula em \"f\" (por exemplo =B2*C2, \
-               =SUM(B2:B30), =SUMIF(A2:A30,\"Aluguel\",B2:B30)); nunca escreva um número calculado à mão;\n\
-               - uma última linha que soma ou agrega as linhas de cima também é uma linha de dados (com fórmulas), e você \
-               diz isso com \"last_row\": \"total\"; sem isso, omita \"last_row\";\n\
+               - TODA célula calculada PRECISA ser uma fórmula em \"f\": total da linha (=B2*C2), total da coluna \
+               (=SUM(B2:B20)), share de um total (=E2/E$21, com a linha absoluta). Nunca escreva um número calculado;\n\
+               - uma linha de total é uma linha de dados com fórmulas, e você diz isso com \"last_row\": \"total\";\n\
+               - valores de dinheiro são positivos; uma coluna de direção/fluxo diz se a linha é entrada ou saída, \
+               então nunca escreva um valor negativo, a menos que a coluna em si seja líquida ou saldo;\n\
                - fórmulas usam nomes de função em inglês e vírgula entre argumentos; o motor tem: {functions};\n\
-               - o conteúdo é em {answer_in}.",
+               - o conteúdo é em {language}.",
     fill: "Preencha a coluna \"{header}\" com {count} células, continuando a tabela.\n\n\
            Dados existentes (cabeçalho e algumas linhas):\n{context}\n\n\
            Devolva um objeto JSON exatamente com esta forma:\n\
@@ -179,23 +183,25 @@ static ES: Prompts = Prompts {
     system: "Eres un asistente de hojas de cálculo. Responde en {answer_in}. Devuelve solo el objeto \
              JSON descrito: sin prosa, sin markdown, sin bloques de código.",
     answer_in: "español",
-    generate: "Crea una hoja de cálculo sobre: {topic}\n\n\
+    generate: "Crea una hoja de cálculo sobre: {topic}\n\
+               Escribe todo el texto (encabezados, elementos, notas) en {language}.\n\n\
                Devuelve un objeto JSON exactamente con esta forma:\n\
                {{\"title\": \"un título corto\", \"columns\": [{{\"title\": \"Artículo\", \"kind\": \"text\"}}, {{\"title\": \"Coste\", \"kind\": \"currency\"}}], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Reglas:\n\
-               - exactamente {rows} filas de datos (sin contar el encabezado);\n\
+               - exactamente {rows} filas de datos (sin contar el encabezado; una fila de total cuenta);\n\
                - cada fila tiene una celda por columna, en el mismo orden que \"columns\";\n\
                - cada columna es un objeto con \"title\" y \"kind\": text, currency, percent, date o month;\n\
                - el encabezado es la fila 1, así que la primera fila de datos es la 2 (una fórmula allí referencia la fila 2);\n\
                - una celda es un valor JSON (texto, número, true/false) o un objeto con una clave: \
                {{\"v\": valor}} es un valor simple escrito tal cual (el texto nunca se lee como fórmula) y \
                {{\"f\": \"=B2*2\"}} es una fórmula que la hoja calcula;\n\
-               - una celda calculada a partir de otras celdas DEBE ser una fórmula en \"f\" (por ejemplo =B2*C2, \
-               =SUM(B2:B30), =SUMIF(A2:A30,\"Alquiler\",B2:B30)); nunca escribas un número calculado a mano;\n\
-               - una última fila que suma o agrega las de arriba también es una fila de datos (con fórmulas), y lo \
-               dices con \"last_row\": \"total\"; si no, omite \"last_row\";\n\
+               - TODA celda calculada DEBE ser una fórmula en \"f\": total de la fila (=B2*C2), total de la columna \
+               (=SUM(B2:B20)), cuota de un total (=E2/E$21, con la fila absoluta). Nunca escribas un número calculado;\n\
+               - una fila de total es una fila de datos con fórmulas, y lo dices con \"last_row\": \"total\";\n\
+               - los importes son positivos; una columna de dirección/flujo dice si la fila es entrada o salida, \
+               así que nunca escribas un importe negativo salvo que la columna sea líquida o un saldo;\n\
                - las fórmulas usan nombres de función en inglés y coma entre argumentos; el motor tiene: {functions};\n\
-               - el contenido está en {answer_in}.",
+               - el contenido está en {language}.",
     fill: "Rellena la columna \"{header}\" con {count} celdas, continuando la tabla.\n\n\
            Datos existentes (encabezado y algunas filas):\n{context}\n\n\
            Devuelve un objeto JSON exactamente con esta forma:\n\
@@ -229,23 +235,25 @@ static JA: Prompts = Prompts {
     system: "あなたは表計算アシスタントです。{answer_in}で答えてください。説明した JSON オブジェクトだけを返してください: \
              文章も markdown もコードフェンスも不要です。",
     answer_in: "日本語",
-    generate: "{topic} についての表計算を作成してください。\n\n\
+    generate: "{topic} についての表計算を作成してください。\n\
+               {language} で書いてください (見出し・項目・メモのすべてのテキスト)。\n\n\
                次の形の JSON オブジェクトを 1 つだけ返してください:\n\
                {{\"title\": \"短いシート名\", \"columns\": [{{\"title\": \"品目\", \"kind\": \"text\"}}, {{\"title\": \"費用\", \"kind\": \"currency\"}}], \"rows\": [[\"テキスト\", 1], [\"テキスト\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                ルール:\n\
-               - データ行はちょうど {rows} 行 (見出しは含めません)。\n\
+               - データ行はちょうど {rows} 行 (見出しは含めません。合計行は 1 行と数えます)。\n\
                - 各行は \"columns\" と同じ順で、列ごとに 1 つのセル。\n\
                - 各列は \"title\" と \"kind\" を持つオブジェクト: text、currency、percent、date、month。\n\
                - 見出しは 1 行目なので、最初のデータ行は 2 行目です (そこに書く数式は 2 行目を参照します)。\n\
                - セルは JSON の値 (テキスト・数値・true/false) か、キーを 1 つ持つオブジェクトです: \
                {{\"v\": 値}} はそのまま書く値 (テキストが数式として読まれることはありません)、 \
                {{\"f\": \"=B2*2\"}} はシートが計算する数式。\n\
-               - 他のセルから計算されるセルは必ず \"f\" の数式にしてください (例: =B2*C2、=SUM(B2:B30)、\
-               =SUMIF(A2:A30,\"家賃\",B2:B30))。計算した数値を手で書いてはいけません。\n\
-               - 上の行を合計・集計する最終行もデータ行です (数式で書く)。その場合は \"last_row\": \"total\" を付け、\
-               そうでなければ \"last_row\" は省略します。\n\
+               - 計算されるセルはすべて \"f\" の数式にしてください: 行の合計 (=B2*C2)、列の合計 \
+               (=SUM(B2:B20))、合計に対する割合 (=E2/E$21、行は絶対参照)。計算した数値を書いてはいけません。\n\
+               - 合計行もデータ行で、数式で書きます。その場合は \"last_row\": \"total\" を付けます。\n\
+               - 金額は正の数です。収入か支出かは方向/フローの列が示すので、列自体が純額や残高でない限り \
+               負の金額は書きません。\n\
                - 数式の関数名は英語、引数はカンマ区切り。エンジンにある関数: {functions}。\n\
-               - 内容は {answer_in}。",
+               - 内容は {language}。",
     fill: "列 \"{header}\" に {count} 個のセルを入れ、表を続けてください。\n\n\
            既存のデータ (見出しと数行):\n{context}\n\n\
            次の形の JSON オブジェクトを 1 つだけ返してください:\n\

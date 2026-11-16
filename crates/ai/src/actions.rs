@@ -15,8 +15,9 @@ use crate::prompts::{ENGINE_FUNCTIONS, fill, for_lang};
 /// What the user asked for.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Request {
-    /// A free description -> a header and `rows` data rows, on a new sheet.
-    GenerateSheet { topic: String, rows: u32 },
+    /// A free description -> a header and `rows` data rows, on a new sheet. `language` is the
+    /// app's interface language name: the content and every text must be written in it.
+    GenerateSheet { topic: String, rows: u32, language: String },
     /// The current column plus its neighbours -> `count` values down the column.
     FillColumn { header: String, context: String, count: u32 },
     /// A question about a cell plus the table around it -> one formula.
@@ -168,14 +169,20 @@ pub fn messages(request: &Request, lang: &str) -> Result<Vec<Msg>, String> {
     let prompts = for_lang(lang);
     let system = Msg::System(fill(prompts.system, &[("answer_in", prompts.answer_in)]));
     let user = match request {
-        Request::GenerateSheet { topic, rows } => {
+        Request::GenerateSheet { topic, rows, language } => {
             let topic = topic.trim();
             if topic.is_empty() {
                 return Err("the topic is empty".into());
             }
             fill(
                 prompts.generate,
-                &[("topic", topic), ("rows", &rows.to_string()), ("answer_in", prompts.answer_in), ("functions", ENGINE_FUNCTIONS)],
+                &[
+                    ("topic", topic),
+                    ("rows", &rows.to_string()),
+                    ("language", language),
+                    ("answer_in", prompts.answer_in),
+                    ("functions", ENGINE_FUNCTIONS),
+                ],
             )
         }
         Request::FillColumn { header, context, count } => fill(
@@ -207,7 +214,7 @@ pub fn messages(request: &Request, lang: &str) -> Result<Vec<Msg>, String> {
 /// accepted (the window applies what came).
 pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
     match request {
-        Request::GenerateSheet { topic, rows } => {
+        Request::GenerateSheet { topic, rows, .. } => {
             let requested = *rows as usize;
             let sheet: SheetAnswer = extract_json(answer)?;
             if sheet.columns.is_empty() {
@@ -376,7 +383,7 @@ mod tests {
     use super::*;
 
     fn generate() -> Request {
-        Request::GenerateSheet { topic: "medicamentos".into(), rows: 3 }
+        Request::GenerateSheet { topic: "medicamentos".into(), rows: 3, language: "português".into() }
     }
 
     #[test]
@@ -543,7 +550,7 @@ mod tests {
 
     #[test]
     fn an_empty_topic_is_refused_before_the_request() {
-        let request = Request::GenerateSheet { topic: "  ".into(), rows: 3 };
+        let request = Request::GenerateSheet { topic: "  ".into(), rows: 3, language: "en".into() };
         assert!(messages(&request, "en").is_err());
     }
 
