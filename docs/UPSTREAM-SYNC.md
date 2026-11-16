@@ -72,6 +72,7 @@ se uma feature entra; fazer merge; abrir PR no upstream.
 | 2026-11-05 | `docs/UPSTREAM-MAP.toml` é o contrato do que pode ser aplicado por script | Evita que nomes de crate/bundle id do upstream entrem no repo |
 | 2026-11-05 | Packaging e CI não vêm do upstream | O molde da suíte (WiX per-machine/per-user, workflows próprios) é a referência |
 | 2026-11-05 | Fontes do craft-fonts passam pelo filtro de asset policy | O repo é clean-room: nada de Adobe/Source/Noto CJK embutido |
+| 2026-11-16 | Aba IA (BYOK) própria: `libs/local-ai` vendored + crate `localsheets-ai` | Feature nossa, sem equivalente no upstream. A chave fica no keychain do SO (nunca em arquivo), o contrato JSON passa pelo extrator tolerante e cada ação é aplicada por comandos do engine dentro de um único grupo de undo |
 
 ## craft-update vendored: fork permanente da suíte (fora do sync)
 
