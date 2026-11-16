@@ -75,6 +75,7 @@ impl SheetApp {
             cut_text: None,
             tab_run: None,
             macros: macro_ui::MacroUi::default(),
+            ai: crate::ai::Ai::default(),
             started: now_ms(),
             allow_close: false,
             bring_forward: false,
@@ -140,6 +141,9 @@ impl SheetApp {
         updates_ui::tick(self, ctx);
         // Files read asynchronously (web file picker, dropped files).
         self.poll_async_opens();
+        if self.ai.tick(&mut self.session) {
+            self.grid.ensure_visible = true;
+        }
         self.autosave(ctx);
         self.update_title(ctx);
         self.request_hidden_paint(ctx);
@@ -228,6 +232,7 @@ impl SheetApp {
         } else {
             ribbon::show(self, ui);
             widgets::notice_bar(self, ui);
+            crate::ai::status_strip(self, ui);
             // Python mode edits only in the formula bar: it shows while a Python edit is open,
             // also when the preference hides it.
             if self.session.prefs.formula_bar || self.editor.as_ref().is_some_and(|e| e.python) {
@@ -250,6 +255,7 @@ impl SheetApp {
         macro_ui::question_box(self, &ctx);
         widgets::message_box(self, &ctx);
         widgets::toast(self, &ctx);
+        crate::ai::windows(self, &ctx);
         // Requests are admitted in `logic`, for the root viewport, so only its pass issues them.
         if ctx.viewport_id() == egui::ViewportId::ROOT {
             control::issue_screenshots(self, &ctx);

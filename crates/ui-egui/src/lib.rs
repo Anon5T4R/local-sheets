@@ -15,6 +15,7 @@ pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     ..craft_update::suite::LOCALSHEETS
 };
 
+pub mod ai;
 pub mod backstage;
 mod border_preview;
 mod cell_pictures;
@@ -296,6 +297,8 @@ pub struct SheetApp {
     tab_run: Option<(u64, usize, u32, CellRef)>,
     /// Automate › Macros: relative recording, recent macros, a macro's question.
     pub macros: macro_ui::MacroUi,
+    /// The AI surface: connections, the sheet actions, their dialogs and the status strip.
+    pub ai: ai::Ai,
     pub started: f64,
     /// Every unsaved workbook has been answered for quitting (or `app.quit` asked): the next
     /// window close goes through.

@@ -29,6 +29,10 @@ localsheets-ui-egui = { path = "crates/ui-egui" }
 localsheets-mcp = { path = "crates/mcp" }
 localsheets-pdf = { path = "crates/pdf" }
 localsheets-math = { path = "crates/math" }
+localsheets-ai = { path = "crates/ai" }
+# The suite's BYOK client (LocalMind, Local Obsidian, ...): one OpenAI-compatible client, the key in
+# the OS keychain. Path dependency (the vendored mirror of Anon5T4R/local-ai), never a git source.
+local-ai = { path = "libs/local-ai" }
 # Every craft-libs crate (craft-update and craft-window here, craft-ui in ui-egui, craft-print in
 # the app) comes from the one vendored craft-libs tree (c5a1cbf): path dependencies, since the CI
 # rejects git sources.

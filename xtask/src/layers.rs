@@ -36,6 +36,9 @@ pub const TABLE: &[(&str, Class)] = &[
     ("model", Class::Layer(2)),
     ("calc", Class::Layer(2)),
     ("xlsx", Class::Layer(2)),
+    // The AI actions: prompts and the tolerant extractor over the shared `local-ai` client. No
+    // workspace crate behind it (the window reads the sheet and applies the commands).
+    ("ai", Class::Layer(2)),
     ("chart", Class::Layer(3)),
     ("engine", Class::Layer(5)),
     ("ui-egui", Class::Layer(6)),

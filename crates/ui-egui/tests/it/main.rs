@@ -9,6 +9,7 @@ mod common;
 mod accounting_fill;
 mod active_row_highlight;
 mod advanced_filter;
+mod ai;
 mod argument_names;
 mod autosave_persist;
 mod borders;

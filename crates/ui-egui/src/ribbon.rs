@@ -10,6 +10,7 @@ use crate::keytips::keytip_table;
 use crate::theme::{self, Cat, Tokens};
 use crate::widgets::{big_button, big_split_button, color_palette, icon_button, small_button, small_split_button, split_button, toggle_button};
 
+mod ai;
 mod automate;
 mod contextual;
 mod controls;
@@ -24,6 +25,7 @@ mod shortcuts;
 mod title_bar;
 mod view;
 
+use ai::ai;
 use automate::automate;
 use contextual::{chart_design, table_design};
 pub(crate) use controls::{ComboResult, editable_combo};
@@ -40,7 +42,7 @@ pub use title_bar::{MAC_CONTENT_LEFT, MAC_TITLE_BAR, TITLE_LEFT_PAD, title_bar};
 use title_bar::{TITLE_BAR_H, TITLE_CONTROL_H};
 use view::view;
 
-pub const TABS: &[&str] = &["Home", "Insert", "Draw", "Page Layout", "Formulas", "Data", "Review", "View", "Automate"];
+pub const TABS: &[&str] = &["Home", "AI", "Insert", "Draw", "Page Layout", "Formulas", "Data", "Review", "View", "Automate"];
 const _: () = assert!(TITLE_CONTROL_H < TITLE_BAR_H, "title-bar controls keep a margin above and below");
 
 /// Draws the ribbon tabs and the active tab's horizontally scrollable card, resetting an unavailable contextual tab to Home.
@@ -143,6 +145,7 @@ pub fn show(app: &mut SheetApp, ui: &mut Ui) {
                         ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
                         match app.ui.ribbon_tab.as_str() {
                             "Home" => home(app, ui),
+                            "AI" => ai(app, ui),
                             "Insert" => insert(app, ui),
                             "Draw" => draw(app, ui),
                             "Page Layout" => page_layout(app, ui),

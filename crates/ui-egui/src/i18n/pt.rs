@@ -1005,6 +1005,38 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Mostrar",
         "Collapse dialog" => "Recolher caixa de diálogo",
         "Expand dialog" => "Expandir caixa de diálogo",
+        // AI: the tab, the connections panel and the three sheet actions.
+        "Generate\nSheet" => "Gerar\nplanilha",
+        "Fill\nColumn" => "Preencher\ncoluna",
+        "Formula" => "Fórmula",
+        "Connections" => "Conexões",
+        "Ask the AI for a new sheet from a description" => "Peça à IA uma planilha nova a partir de uma descrição",
+        "Fill the current column from the neighbouring columns" => "Preencha a coluna atual a partir das colunas vizinhas",
+        "Ask for the current cell's formula in plain language" => "Peça a fórmula da célula atual em linguagem natural",
+        "AI providers, keys and models" => "Provedores, chaves e modelos de IA",
+        "AI connections" => "Conexões de IA",
+        "The key lives in the OS keychain; the connection file never holds it." => {
+            "A chave fica no cofre do sistema; o arquivo da conexão nunca a guarda."
+        }
+        "No connections yet." => "Ainda não há conexões.",
+        "key saved" => "chave salva",
+        "Add connection" => "Adicionar conexão",
+        "Provider" => "Provedor",
+        "Label" => "Rótulo",
+        "Base URL" => "URL base",
+        "Model" => "Modelo",
+        "Fetch models" => "Buscar modelos",
+        "API key" => "Chave de API",
+        "Save connection" => "Salvar conexão",
+        "Generate sheet" => "Gerar planilha",
+        "Describe the sheet: a topic, or a whole text to organize." => "Descreva a planilha: um tema ou um texto inteiro para organizar.",
+        "Generate" => "Gerar",
+        "Fill column" => "Preencher coluna",
+        "Fill the current column from the neighbouring columns." => "Preencha a coluna atual a partir das colunas vizinhas.",
+        "Target" => "Destino",
+        "Cell" => "Célula",
+        "Ask for the formula in plain language." => "Peça a fórmula em linguagem natural.",
+        "Write formula" => "Escrever fórmula",
         _ => return None,
     })
 }

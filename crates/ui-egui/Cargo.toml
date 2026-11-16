@@ -14,6 +14,7 @@ workspace = true
 craft-ui = { path = "../../libs/craft-libs/crates/ui/" }
 localsheets-engine = { workspace = true }
 localsheets-chart = { workspace = true }
+localsheets-ai = { workspace = true }
 # `monochrome_emoji_fonts` restores the Noto Emoji and emoji-icon faces that 0.37 moved behind
 # this feature. The UI draws ✕, ◀, ↘ and 📋 as text; without these faces the strict kittest
 # harness (and a host with no symbol font) renders them as tofu.
