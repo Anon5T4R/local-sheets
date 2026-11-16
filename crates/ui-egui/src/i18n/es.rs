@@ -539,6 +539,17 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Cell" => "Celda",
         "Ask for the formula in plain language." => "Pide la fórmula en lenguaje natural.",
         "Write formula" => "Escribir fórmula",
+        "Preset" => "Estilo",
+        "Simple table" => "Tabla simple",
+        "Raw data" => "Datos sin formato",
+        "Format table" => "Dar formato a la tabla",
+        "Apply" => "Aplicar",
+        "Range" => "Rango",
+        "The model reads the table; the preset is what formats it. No data is written." => {
+            "El modelo lee la tabla; el estilo es lo que la formatea. No se escribe ningún dato."
+        }
+        "Format\nTable" => "Formato de\ntabla",
+        "Format the selected table with a preset" => "Da formato a la tabla seleccionada con un estilo",
         _ => return None,
     })
 }

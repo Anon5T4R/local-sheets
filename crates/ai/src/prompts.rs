@@ -12,6 +12,8 @@ pub struct Prompts {
     pub generate: &'static str,
     pub fill: &'static str,
     pub formula: &'static str,
+    /// The classifier: what each column of an existing table holds (no data is generated).
+    pub classify: &'static str,
 }
 
 /// The prompts for a language code (`pt`, `pt-br`, `es`, `ja`, ...): Portuguese, Spanish and
@@ -79,16 +81,19 @@ static EN: Prompts = Prompts {
     answer_in: "English",
     generate: "Build a spreadsheet about: {topic}\n\n\
                Return one JSON object with exactly this shape:\n\
-               {{\"title\": \"a short sheet title\", \"columns\": [\"Header 1\", \"Header 2\"], \"rows\": [[\"text\", 1], [\"text\", {{\"f\": \"=B2*2\"}}]]}}\n\n\
+               {{\"title\": \"a short sheet title\", \"columns\": [{{\"title\": \"Item\", \"kind\": \"text\"}}, {{\"title\": \"Cost\", \"kind\": \"currency\"}}], \"rows\": [[\"text\", 1], [\"text\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Rules:\n\
-               - exactly {rows} data rows;\n\
+               - exactly {rows} data rows (not counting the header);\n\
                - every row has one cell per column, in the same order as \"columns\";\n\
+               - every column is an object with its \"title\" and its \"kind\": text, currency, percent, date or month;\n\
                - the header is row 1, so the first data row is row 2 (a formula there references row 2);\n\
                - a cell is a JSON value (text, number, true/false) or an object with one key: \
                {{\"v\": value}} is a plain value written as typed (text is never read as a formula), \
                and {{\"f\": \"=B2*2\"}} is a formula the sheet computes;\n\
                - a cell computed from other cells MUST be a formula in \"f\" (for example =B2*C2, =SUM(B2:B30), \
                =SUMIF(A2:A30,\"Rent\",B2:B30)); never write a computed number by hand;\n\
+               - a last row that sums or aggregates the rows above is a data row too (formulas), and you say so \
+               with \"last_row\": \"total\"; omit \"last_row\" otherwise;\n\
                - formulas use English function names and a comma between arguments; the engine has: {functions};\n\
                - the content is in {answer_in}.",
     fill: "Fill the column \"{header}\" with {count} cells, continuing the table.\n\n\
@@ -110,6 +115,14 @@ static EN: Prompts = Prompts {
               - canonical Excel syntax: English function names, A1 references, a comma between arguments;\n\
               - start with \"=\";\n\
               - no prose, no explanation.",
+    classify: "Read this table and say what each column holds. Do not rewrite or invent any value.\n\n\
+               Range: {range}\nHeader: {header}\nSample rows:\n{sample}\n\n\
+               Return one JSON object with exactly this shape:\n\
+               {{\"columns\": [\"currency\", \"percent\", \"text\"], \"total_row\": false}}\n\n\
+               Rules:\n\
+               - one kind per column, in the header's order: text, currency, percent, date or month;\n\
+               - \"total_row\" is true only when the last row sums or aggregates the rows above it;\n\
+               - no text, no explanation.",
 };
 
 static PT: Prompts = Prompts {
@@ -118,16 +131,19 @@ static PT: Prompts = Prompts {
     answer_in: "português (Brasil)",
     generate: "Monte uma planilha sobre: {topic}\n\n\
                Devolva um objeto JSON exatamente com esta forma:\n\
-               {{\"title\": \"um título curto\", \"columns\": [\"Cabeçalho 1\", \"Cabeçalho 2\"], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]]}}\n\n\
+               {{\"title\": \"um título curto\", \"columns\": [{{\"title\": \"Item\", \"kind\": \"text\"}}, {{\"title\": \"Custo\", \"kind\": \"currency\"}}], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Regras:\n\
-               - exatamente {rows} linhas de dados;\n\
+               - exatamente {rows} linhas de dados (sem contar o cabeçalho);\n\
                - cada linha tem uma célula por coluna, na mesma ordem de \"columns\";\n\
+               - cada coluna é um objeto com \"title\" e \"kind\": text, currency, percent, date ou month;\n\
                - o cabeçalho é a linha 1, então a primeira linha de dados é a 2 (uma fórmula ali referencia a linha 2);\n\
                - uma célula é um valor JSON (texto, número, true/false) ou um objeto com uma chave: \
                {{\"v\": valor}} é um valor simples escrito como está (texto nunca é lido como fórmula) e \
                {{\"f\": \"=B2*2\"}} é uma fórmula que a planilha calcula;\n\
                - uma célula calculada a partir de outras células PRECISA ser uma fórmula em \"f\" (por exemplo =B2*C2, \
                =SUM(B2:B30), =SUMIF(A2:A30,\"Aluguel\",B2:B30)); nunca escreva um número calculado à mão;\n\
+               - uma última linha que soma ou agrega as linhas de cima também é uma linha de dados (com fórmulas), e você \
+               diz isso com \"last_row\": \"total\"; sem isso, omita \"last_row\";\n\
                - fórmulas usam nomes de função em inglês e vírgula entre argumentos; o motor tem: {functions};\n\
                - o conteúdo é em {answer_in}.",
     fill: "Preencha a coluna \"{header}\" com {count} células, continuando a tabela.\n\n\
@@ -149,6 +165,14 @@ static PT: Prompts = Prompts {
               - sintaxe canônica do Excel: nomes de função em inglês, referências A1, vírgula entre argumentos;\n\
               - comece com \"=\";\n\
               - sem prosa, sem explicação.",
+    classify: "Leia esta tabela e diga o que cada coluna contém. Não reescreva nem invente nenhum valor.\n\n\
+               Intervalo: {range}\nCabeçalho: {header}\nAmostra de linhas:\n{sample}\n\n\
+               Devolva um objeto JSON exatamente com esta forma:\n\
+               {{\"columns\": [\"currency\", \"percent\", \"text\"], \"total_row\": false}}\n\n\
+               Regras:\n\
+               - um tipo por coluna, na ordem do cabeçalho: text, currency, percent, date ou month;\n\
+               - \"total_row\" é true só quando a última linha soma ou agrega as linhas de cima;\n\
+               - sem texto, sem explicação.",
 };
 
 static ES: Prompts = Prompts {
@@ -157,16 +181,19 @@ static ES: Prompts = Prompts {
     answer_in: "español",
     generate: "Crea una hoja de cálculo sobre: {topic}\n\n\
                Devuelve un objeto JSON exactamente con esta forma:\n\
-               {{\"title\": \"un título corto\", \"columns\": [\"Encabezado 1\", \"Encabezado 2\"], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]]}}\n\n\
+               {{\"title\": \"un título corto\", \"columns\": [{{\"title\": \"Artículo\", \"kind\": \"text\"}}, {{\"title\": \"Coste\", \"kind\": \"currency\"}}], \"rows\": [[\"texto\", 1], [\"texto\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                Reglas:\n\
-               - exactamente {rows} filas de datos;\n\
+               - exactamente {rows} filas de datos (sin contar el encabezado);\n\
                - cada fila tiene una celda por columna, en el mismo orden que \"columns\";\n\
+               - cada columna es un objeto con \"title\" y \"kind\": text, currency, percent, date o month;\n\
                - el encabezado es la fila 1, así que la primera fila de datos es la 2 (una fórmula allí referencia la fila 2);\n\
                - una celda es un valor JSON (texto, número, true/false) o un objeto con una clave: \
                {{\"v\": valor}} es un valor simple escrito tal cual (el texto nunca se lee como fórmula) y \
                {{\"f\": \"=B2*2\"}} es una fórmula que la hoja calcula;\n\
                - una celda calculada a partir de otras celdas DEBE ser una fórmula en \"f\" (por ejemplo =B2*C2, \
                =SUM(B2:B30), =SUMIF(A2:A30,\"Alquiler\",B2:B30)); nunca escribas un número calculado a mano;\n\
+               - una última fila que suma o agrega las de arriba también es una fila de datos (con fórmulas), y lo \
+               dices con \"last_row\": \"total\"; si no, omite \"last_row\";\n\
                - las fórmulas usan nombres de función en inglés y coma entre argumentos; el motor tiene: {functions};\n\
                - el contenido está en {answer_in}.",
     fill: "Rellena la columna \"{header}\" con {count} celdas, continuando la tabla.\n\n\
@@ -188,6 +215,14 @@ static ES: Prompts = Prompts {
               - sintaxis canónica de Excel: nombres de función en inglés, referencias A1, coma entre argumentos;\n\
               - empieza por \"=\";\n\
               - sin prosa, sin explicación.",
+    classify: "Lee esta tabla y di qué contiene cada columna. No reescribas ni inventes ningún valor.\n\n\
+               Rango: {range}\nEncabezado: {header}\nFilas de muestra:\n{sample}\n\n\
+               Devuelve un objeto JSON exactamente con esta forma:\n\
+               {{\"columns\": [\"currency\", \"percent\", \"text\"], \"total_row\": false}}\n\n\
+               Reglas:\n\
+               - un tipo por columna, en el orden del encabezado: text, currency, percent, date o month;\n\
+               - \"total_row\" es true solo cuando la última fila suma o agrega las de arriba;\n\
+               - sin texto, sin explicación.",
 };
 
 static JA: Prompts = Prompts {
@@ -196,16 +231,19 @@ static JA: Prompts = Prompts {
     answer_in: "日本語",
     generate: "{topic} についての表計算を作成してください。\n\n\
                次の形の JSON オブジェクトを 1 つだけ返してください:\n\
-               {{\"title\": \"短いシート名\", \"columns\": [\"見出し 1\", \"見出し 2\"], \"rows\": [[\"テキスト\", 1], [\"テキスト\", {{\"f\": \"=B2*2\"}}]]}}\n\n\
+               {{\"title\": \"短いシート名\", \"columns\": [{{\"title\": \"品目\", \"kind\": \"text\"}}, {{\"title\": \"費用\", \"kind\": \"currency\"}}], \"rows\": [[\"テキスト\", 1], [\"テキスト\", {{\"f\": \"=B2*2\"}}]], \"last_row\": \"total\"}}\n\n\
                ルール:\n\
-               - データ行はちょうど {rows} 行。\n\
+               - データ行はちょうど {rows} 行 (見出しは含めません)。\n\
                - 各行は \"columns\" と同じ順で、列ごとに 1 つのセル。\n\
+               - 各列は \"title\" と \"kind\" を持つオブジェクト: text、currency、percent、date、month。\n\
                - 見出しは 1 行目なので、最初のデータ行は 2 行目です (そこに書く数式は 2 行目を参照します)。\n\
                - セルは JSON の値 (テキスト・数値・true/false) か、キーを 1 つ持つオブジェクトです: \
                {{\"v\": 値}} はそのまま書く値 (テキストが数式として読まれることはありません)、 \
                {{\"f\": \"=B2*2\"}} はシートが計算する数式。\n\
                - 他のセルから計算されるセルは必ず \"f\" の数式にしてください (例: =B2*C2、=SUM(B2:B30)、\
                =SUMIF(A2:A30,\"家賃\",B2:B30))。計算した数値を手で書いてはいけません。\n\
+               - 上の行を合計・集計する最終行もデータ行です (数式で書く)。その場合は \"last_row\": \"total\" を付け、\
+               そうでなければ \"last_row\" は省略します。\n\
                - 数式の関数名は英語、引数はカンマ区切り。エンジンにある関数: {functions}。\n\
                - 内容は {answer_in}。",
     fill: "列 \"{header}\" に {count} 個のセルを入れ、表を続けてください。\n\n\
@@ -227,6 +265,14 @@ static JA: Prompts = Prompts {
               - 標準の Excel 構文: 関数名は英語、A1 参照、引数はカンマ区切り。\n\
               - \"=\" で始める。\n\
               - 文章・説明は不要。",
+    classify: "この表を読み、各列が何を表すかだけを答えてください。値を書き換えたり作ったりしてはいけません。\n\n\
+               範囲: {range}\n見出し: {header}\nサンプル行:\n{sample}\n\n\
+               次の形の JSON オブジェクトを 1 つだけ返してください:\n\
+               {{\"columns\": [\"currency\", \"percent\", \"text\"], \"total_row\": false}}\n\n\
+               ルール:\n\
+               - 見出しの順に、列ごとに 1 つの種類: text、currency、percent、date、month。\n\
+               - \"total_row\" は最終行が上の行を合計・集計しているときだけ true。\n\
+               - 文章・説明は不要。",
 };
 
 #[cfg(test)]
@@ -294,7 +340,10 @@ mod tests {
             assert!(prompts.generate.contains("\"f\""), "no formula channel in a generate prompt");
             assert!(prompts.generate.contains("\"v\""));
             assert!(prompts.generate.contains("{functions}"), "the function hint is missing");
+            assert!(prompts.generate.contains("\"kind\""), "no column kind in a generate prompt");
+            assert!(prompts.generate.contains("\"last_row\""));
             assert!(prompts.fill.contains("\"f\""));
+            assert!(prompts.classify.contains("\"columns\"") && prompts.classify.contains("\"total_row\""));
         }
     }
 }

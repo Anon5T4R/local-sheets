@@ -21,6 +21,97 @@ pub enum Request {
     FillColumn { header: String, context: String, count: u32 },
     /// A question about a cell plus the table around it -> one formula.
     Formula { question: String, cell: String, context: String },
+    /// The headers and a sample of the selected table -> what each column holds, and whether the
+    /// last row is a total. Nothing is generated: the app applies its own preset.
+    ClassifyTable { range: String, header: String, sample: String },
+}
+
+/// A column's data kind: the closed vocabulary the model may label (never a format string).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Kind {
+    #[default]
+    Text,
+    Currency,
+    Percent,
+    Date,
+    Month,
+}
+
+impl Kind {
+    /// The label, as the contract writes it.
+    pub fn id(self) -> &'static str {
+        match self {
+            Kind::Text => "text",
+            Kind::Currency => "currency",
+            Kind::Percent => "percent",
+            Kind::Date => "date",
+            Kind::Month => "month",
+        }
+    }
+
+    /// The kind `name` labels, or [`Kind::Text`] for anything else (a closed vocabulary: an
+    /// invented label never reaches a number format).
+    pub fn from_id(name: &str) -> Self {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "currency" => Kind::Currency,
+            "percent" | "percentage" => Kind::Percent,
+            "date" => Kind::Date,
+            "month" => Kind::Month,
+            _ => Kind::Text,
+        }
+    }
+}
+
+/// One column of a generated sheet: its header and what the values are.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Column {
+    pub title: String,
+    pub kind: Kind,
+}
+
+/// The look the app applies after an answer. Its styles are the app's own: the model only labels
+/// cells, and the preset never reaches the prompt.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Preset {
+    /// No preset: the answer is written as it came.
+    #[default]
+    None,
+    /// Header band, top row frozen, a number format per column, totals row set apart.
+    Financial,
+    /// A table: header band, autofit and banded rows.
+    Table,
+    /// Plain data: autofit only.
+    Raw,
+}
+
+impl Preset {
+    /// Every preset, in picker order (the default first).
+    pub const ALL: [Preset; 4] = [Preset::None, Preset::Financial, Preset::Table, Preset::Raw];
+
+    /// The id the dialog stores (stable across releases).
+    pub fn id(self) -> &'static str {
+        match self {
+            Preset::None => "none",
+            Preset::Financial => "financial",
+            Preset::Table => "table",
+            Preset::Raw => "raw",
+        }
+    }
+
+    /// The name the picker shows.
+    pub fn label(self) -> &'static str {
+        match self {
+            Preset::None => "None",
+            Preset::Financial => "Financial",
+            Preset::Table => "Simple table",
+            Preset::Raw => "Raw data",
+        }
+    }
+
+    /// The preset `id` names, or [`Preset::None`].
+    pub fn from_id(id: &str) -> Self {
+        Self::ALL.into_iter().find(|preset| preset.id() == id).unwrap_or(Preset::None)
+    }
 }
 
 /// One cell of an answer: a plain value, or a formula the spreadsheet computes.
@@ -39,12 +130,15 @@ pub enum Cell {
 /// What the answer became, ready to apply with engine commands.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
-    /// A new sheet: `columns` is the header row, `rows` the data.
-    Sheet { title: String, columns: Vec<String>, rows: Vec<Vec<Cell>> },
+    /// A new sheet: `columns` is the header row, `rows` the data, `total_row` a last row that
+    /// aggregates the ones above it.
+    Sheet { title: String, columns: Vec<Column>, rows: Vec<Vec<Cell>>, total_row: bool },
     /// Values for a column (top to bottom).
     Values { values: Vec<Cell> },
     /// One formula, starting with `=`.
     Formula { formula: String },
+    /// What the selected table holds, column by column, and whether its last row is a total.
+    Table { columns: Vec<Kind>, total_row: bool },
 }
 
 impl Request {
@@ -54,15 +148,17 @@ impl Request {
             Request::GenerateSheet { .. } => "Generating a sheet",
             Request::FillColumn { .. } => "Filling the column",
             Request::Formula { .. } => "Writing the formula",
+            Request::ClassifyTable { .. } => "Reading the table",
         }
     }
 
-    /// The subject appended to the label (the topic, the column header, the cell).
+    /// The subject appended to the label (the topic, the column header, the cell, the range).
     pub fn subject(&self) -> &str {
         match self {
             Request::GenerateSheet { topic, .. } => topic,
             Request::FillColumn { header, .. } => header,
             Request::Formula { cell, .. } => cell,
+            Request::ClassifyTable { range, .. } => range,
         }
     }
 }
@@ -99,6 +195,9 @@ pub fn messages(request: &Request, lang: &str) -> Result<Vec<Msg>, String> {
             }
             fill(prompts.formula, &[("cell", cell), ("question", question), ("context", context), ("answer_in", prompts.answer_in)])
         }
+        Request::ClassifyTable { range, header, sample } => {
+            fill(prompts.classify, &[("range", range), ("header", header), ("sample", sample), ("answer_in", prompts.answer_in)])
+        }
     };
     Ok(vec![system, Msg::User(user)])
 }
@@ -134,7 +233,21 @@ pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
             data.truncate(requested.max(1));
             let title =
                 if sheet.title.trim().is_empty() { topic.trim().chars().take(40).collect() } else { sheet.title.trim().chars().take(40).collect() };
-            Ok(Outcome::Sheet { title, columns: sheet.columns, rows: data })
+            let columns: Vec<Column> = sheet
+                .columns
+                .into_iter()
+                .map(|column| match column {
+                    ColumnAnswer::Title(title) => Column { title: title.trim().to_string(), kind: Kind::Text },
+                    ColumnAnswer::Object { title, kind } => {
+                        Column { title: title.trim().to_string(), kind: Kind::from_id(kind.as_deref().unwrap_or("text")) }
+                    }
+                })
+                .collect();
+            if let Some(index) = columns.iter().position(|column| column.title.is_empty()) {
+                return Err(format!("the model answered column {} without a title", index + 1));
+            }
+            let total_row = sheet.last_row.as_deref().is_some_and(|role| role.eq_ignore_ascii_case("total"));
+            Ok(Outcome::Sheet { title, columns, rows: data, total_row })
         }
         Request::FillColumn { count, .. } => {
             let answer: ValuesAnswer = extract_json(answer)?;
@@ -155,6 +268,21 @@ pub fn interpret(request: &Request, answer: &str) -> Result<Outcome, String> {
                 return Err("the model did not answer a formula".into());
             }
             Ok(Outcome::Formula { formula: if formula.starts_with('=') { formula.to_owned() } else { format!("={formula}") } })
+        }
+        Request::ClassifyTable { .. } => {
+            let answer: ClassifyAnswer = extract_json(answer)?;
+            if answer.columns.is_empty() {
+                return Err("the model did not answer any column".into());
+            }
+            let columns = answer
+                .columns
+                .into_iter()
+                .map(|column| match column {
+                    ClassifiedColumn::Kind(kind) => Kind::from_id(&kind),
+                    ClassifiedColumn::Object { kind } => Kind::from_id(kind.as_deref().unwrap_or("text")),
+                })
+                .collect();
+            Ok(Outcome::Table { columns, total_row: answer.total_row })
         }
     }
 }
@@ -190,9 +318,45 @@ struct SheetAnswer {
     #[serde(default)]
     title: String,
     #[serde(default)]
-    columns: Vec<String>,
+    columns: Vec<ColumnAnswer>,
     #[serde(default)]
     rows: Vec<Vec<Value>>,
+    /// `"total"` marks the last row as the totals row (the app draws it apart).
+    #[serde(default)]
+    last_row: Option<String>,
+}
+
+/// A column as the contract writes it (an object with a title and a kind) or as a model may still
+/// answer it (the header alone, which is text).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ColumnAnswer {
+    Title(String),
+    Object {
+        #[serde(default)]
+        title: String,
+        #[serde(default)]
+        kind: Option<String>,
+    },
+}
+
+#[derive(Deserialize)]
+struct ClassifyAnswer {
+    #[serde(default)]
+    columns: Vec<ClassifiedColumn>,
+    #[serde(default)]
+    total_row: bool,
+}
+
+/// One classified column: a bare kind label or an object that carries it.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ClassifiedColumn {
+    Kind(String),
+    Object {
+        #[serde(default)]
+        kind: Option<String>,
+    },
 }
 
 #[derive(Deserialize)]
@@ -220,9 +384,12 @@ mod tests {
         let answer = r#"{"title":"Medicamentos","columns":["Nome","Dose"],"rows":[["A",1],["B",2]]}"#;
         let outcome = interpret(&generate(), answer).expect("a sheet");
         match outcome {
-            Outcome::Sheet { title, columns, rows } => {
+            Outcome::Sheet { title, columns, rows, total_row } => {
                 assert_eq!(title, "Medicamentos");
-                assert_eq!(columns, ["Nome", "Dose"]);
+                let titles: Vec<&str> = columns.iter().map(|column| column.title.as_str()).collect();
+                assert_eq!(titles, ["Nome", "Dose"]);
+                assert!(columns.iter().all(|column| column.kind == Kind::Text), "string headers are text");
+                assert!(!total_row);
                 assert_eq!(rows.len(), 2);
                 assert_eq!(rows[0], vec![Cell::Value(Value::String("A".into())), Cell::Value(Value::from(1))]);
             }
@@ -269,6 +436,56 @@ mod tests {
         let answer = r#"{"columns":["A"],"rows":[[{"x":1}]]}"#;
         let error = interpret(&generate(), answer).expect_err("no v/f");
         assert!(error.contains("row 1 column 1") && error.contains("`v`"), "{error}");
+    }
+
+    /// The preset vocabulary: each column says what it holds, and a last row that totals is marked.
+    #[test]
+    fn columns_carry_their_kind_and_a_total_row_is_marked() {
+        let answer = r#"{"columns":[{"title":"Item","kind":"text"},{"title":"Cost","kind":"currency"},{"title":"Share","kind":"percent"}],"rows":[["Rent",1200,{"f":"=B2/B4"}]],"last_row":"total"}"#;
+        match interpret(&generate(), answer).expect("a sheet") {
+            Outcome::Sheet { columns, total_row, .. } => {
+                assert_eq!(columns.iter().map(|column| column.kind).collect::<Vec<_>>(), [Kind::Text, Kind::Currency, Kind::Percent]);
+                assert!(total_row, "the last row is the totals row");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// A label outside the closed vocabulary is text: it never becomes a number format.
+    #[test]
+    fn an_invented_kind_is_text() {
+        assert_eq!(Kind::from_id("money-ish"), Kind::Text);
+        assert_eq!(Kind::from_id(""), Kind::Text);
+        assert_eq!(Kind::from_id("PERCENT"), Kind::Percent);
+        let answer = r#"{"columns":[{"title":"A","kind":"dinheiro"}],"rows":[[1]]}"#;
+        match interpret(&generate(), answer).expect("a sheet") {
+            Outcome::Sheet { columns, .. } => assert_eq!(columns[0].kind, Kind::Text),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_classified_table_answers_one_kind_per_column() {
+        let request = Request::ClassifyTable { range: "A1:C4".into(), header: "A | B | C".into(), sample: "1 | 2 | 3".into() };
+        let answer = r#"{"columns":["text","currency",{"kind":"percent"},"date"],"total_row":true}"#;
+        match interpret(&request, answer).expect("roles") {
+            Outcome::Table { columns, total_row } => {
+                assert_eq!(columns, [Kind::Text, Kind::Currency, Kind::Percent, Kind::Date]);
+                assert!(total_row);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn presets_round_trip_by_id_and_none_is_the_default() {
+        assert_eq!(Preset::default(), Preset::None);
+        assert_eq!(Preset::ALL.len(), 4);
+        for preset in Preset::ALL {
+            assert_eq!(Preset::from_id(preset.id()), preset);
+            assert!(!preset.label().is_empty());
+        }
+        assert_eq!(Preset::from_id("unknown"), Preset::None);
     }
 
     /// A reasoning block and a markdown fence are the extractor's problem, not this action's.

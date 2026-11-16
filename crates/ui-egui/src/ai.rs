@@ -13,7 +13,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 
 use egui::{Context, RichText, Ui};
 use localsheets_ai::local_ai::{self, Connection};
-use localsheets_ai::{AI_APP_ID, AI_APP_URL, Backend, Cell, LiveBackend, Outcome, Request};
+use localsheets_ai::{AI_APP_ID, AI_APP_URL, Backend, Cell, Kind, LiveBackend, Outcome, Preset, Request};
 use localsheets_engine::EngineError;
 use localsheets_engine::Session;
 use localsheets_engine::core::{CellRef, MAX_COLS, MAX_ROWS, RangeRef};
@@ -30,12 +30,22 @@ enum Event {
 /// Where an outcome is applied, in engine terms.
 #[derive(Clone)]
 pub(crate) enum Apply {
-    /// A new sheet (the outcome carries the cells).
-    Sheet,
+    /// A new sheet (the outcome carries the cells), and the look the user picked for it.
+    Sheet { preset: Preset },
     /// The target column: where it starts and the A1 range the values go into.
     Fill { start: CellRef, range: String },
     /// The cell the formula goes into.
     Formula { cell: CellRef },
+    /// An existing table, formatted with the classifier's roles and the user's preset.
+    Table { start: CellRef, end: CellRef, preset: Preset },
+}
+
+/// The last generate the user ran, so its dialog opens pre-filled (the suite's "repeat" gesture).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LastGenerate {
+    pub topic: String,
+    pub rows: u32,
+    pub preset: Preset,
 }
 
 /// The request in flight.
@@ -61,9 +71,38 @@ pub struct Draft {
 
 /// One of the action dialogs.
 pub enum Dialog {
-    Generate { topic: String, rows: u32, error: Option<String> },
-    Fill { header: String, context: String, target: String, start: CellRef, count: u32, single: bool, error: Option<String> },
-    Formula { question: String, cell: CellRef, context: String, formula: Option<String>, error: Option<String> },
+    Generate {
+        topic: String,
+        rows: u32,
+        preset: Preset,
+        error: Option<String>,
+    },
+    Fill {
+        header: String,
+        context: String,
+        target: String,
+        start: CellRef,
+        count: u32,
+        single: bool,
+        error: Option<String>,
+    },
+    Formula {
+        question: String,
+        cell: CellRef,
+        context: String,
+        formula: Option<String>,
+        error: Option<String>,
+    },
+    /// The classifier's dialog: what the selected table holds, and the look to give it.
+    Format {
+        preset: Preset,
+        start: CellRef,
+        end: CellRef,
+        range: String,
+        header: String,
+        sample: String,
+        error: Option<String>,
+    },
 }
 
 /// The AI state the window owns.
@@ -80,6 +119,8 @@ pub struct Ai {
     fetching: Option<Receiver<Result<Vec<String>, String>>>,
     running: Option<Running>,
     pub error: Option<String>,
+    /// The last generated sheet's request (repeat).
+    pub last: Option<LastGenerate>,
 }
 
 impl Default for Ai {
@@ -107,6 +148,7 @@ impl Default for Ai {
             fetching: None,
             running: None,
             error,
+            last: None,
         }
     }
 }
@@ -136,6 +178,10 @@ impl Ai {
             return Err("No AI connection yet. Open AI > Connections and add one.".into());
         };
         let messages = localsheets_ai::actions::messages(&request, lang)?;
+        // Remember the request, so the dialog can come back pre-filled (repeat).
+        if let (Request::GenerateSheet { topic, rows }, Apply::Sheet { preset }) = (&request, &apply) {
+            self.last = Some(LastGenerate { topic: topic.clone(), rows: *rows, preset: *preset });
+        }
         let (tx, rx) = mpsc::channel();
         let backend = self.backend.clone();
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -226,7 +272,9 @@ impl Ai {
     /// answers in its own dialog). The reason goes into the dialog, not the strip.
     fn reopen_after_refusal(&mut self, request: &Request, apply: Apply, error: String) {
         self.dialog = match (request, apply) {
-            (Request::GenerateSheet { topic, rows }, _) => Some(Dialog::Generate { topic: topic.clone(), rows: *rows, error: Some(error) }),
+            (Request::GenerateSheet { topic, rows }, Apply::Sheet { preset }) => {
+                Some(Dialog::Generate { topic: topic.clone(), rows: *rows, preset, error: Some(error) })
+            }
             (Request::FillColumn { header, context, count }, Apply::Fill { start, range }) => Some(Dialog::Fill {
                 header: header.clone(),
                 context: context.clone(),
@@ -264,7 +312,10 @@ impl Ai {
     /// group rolled back and the message belongs in the strip.
     fn apply(&mut self, session: &mut Session, request: &Request, target: Apply, outcome: Outcome) -> Result<bool, String> {
         match (request, target, outcome) {
-            (Request::GenerateSheet { .. }, Apply::Sheet, Outcome::Sheet { title, columns, rows }) => {
+            (Request::GenerateSheet { .. }, Apply::Sheet { preset }, Outcome::Sheet { title, columns, rows, total_row }) => {
+                let width = columns.len();
+                let kinds: Vec<Kind> = columns.iter().map(|column| column.kind).collect();
+                let data_rows = rows.len();
                 session
                     .grouped("AI: generate sheet", |s| {
                         let inserted = match s.execute("home.insertSheet", json!({ "name": sheet_name(&title) })) {
@@ -277,7 +328,7 @@ impl Ai {
                         // engine evaluates them against).
                         s.execute("sheet.activate", json!({ "sheet": index }))?;
                         let mut matrix: Vec<Vec<Value>> = Vec::with_capacity(rows.len() + 1);
-                        matrix.push(columns.into_iter().map(Value::String).collect());
+                        matrix.push(columns.into_iter().map(|column| Value::String(column.title)).collect());
                         let (data, formulas) = cells_matrix(rows, CellRef::new(1, 0));
                         matrix.extend(data);
                         let (matrix, post) = split_equals(matrix, CellRef::new(0, 0));
@@ -286,7 +337,22 @@ impl Ai {
                             s.execute("cell.set", json!({ "sheet": index, "cell": cell.a1(), "input": format!("'{text}") }))?;
                         }
                         write_formulas(s, &formulas)?;
+                        apply_preset(
+                            s,
+                            preset,
+                            &TableShape { start: CellRef::new(0, 0), width, rows: 1 + data_rows, kinds, total_row, header: true },
+                        )?;
                         Ok(())
+                    })
+                    .map_err(|e| e.to_string())?;
+                Ok(true)
+            }
+            (Request::ClassifyTable { .. }, Apply::Table { start, end, preset }, Outcome::Table { columns, total_row }) => {
+                let width = end.col.saturating_sub(start.col) as usize + 1;
+                let rows = end.row.saturating_sub(start.row) as usize + 1;
+                session
+                    .grouped("AI: format table", |s| {
+                        apply_preset(s, preset, &TableShape { start, width, rows, kinds: columns, total_row, header: true })
                     })
                     .map_err(|e| e.to_string())?;
                 Ok(true)
@@ -336,8 +402,29 @@ impl Ai {
         }
     }
 
+    /// Opens the generate dialog. It comes back pre-filled with the last request (the suite's
+    /// "repeat" gesture), so asking again is one click.
     pub(crate) fn open_generate(&mut self) {
-        self.dialog = Some(Dialog::Generate { topic: String::new(), rows: 20, error: None });
+        let (topic, rows, preset) = self.last.as_ref().map_or((String::new(), 20, Preset::None), |last| (last.topic.clone(), last.rows, last.preset));
+        self.dialog = Some(Dialog::Generate { topic, rows, preset, error: None });
+    }
+
+    /// Opens the classifier's dialog on the selected table: the model only labels the columns, the
+    /// chosen preset is what formats them.
+    pub(crate) fn open_format(&mut self, session: &Session) {
+        let Some(context) = table_context(session) else {
+            self.error = Some("Select the table to format first.".into());
+            return;
+        };
+        self.dialog = Some(Dialog::Format {
+            preset: Preset::Financial,
+            start: context.start,
+            end: context.end,
+            range: context.range,
+            header: context.header,
+            sample: context.sample,
+            error: None,
+        });
     }
 
     /// Fills the current column. A multi-cell selection fixes the rows; a single cell asks how many
@@ -474,6 +561,119 @@ fn write_formulas(s: &mut Session, formulas: &[(CellRef, String)]) -> Result<(),
         s.execute("cell.set", json!({ "cell": cell.a1(), "input": formula }))?;
     }
     Ok(())
+}
+
+/// The cells a preset formats: where the table starts, how wide and tall it is, and what the
+/// classifier (or the generator) said about each column.
+struct TableShape {
+    start: CellRef,
+    width: usize,
+    rows: usize,
+    kinds: Vec<Kind>,
+    total_row: bool,
+    header: bool,
+}
+
+impl TableShape {
+    /// The A1 range of the whole table.
+    fn range(&self) -> String {
+        let end = self.start.offset(self.rows.saturating_sub(1) as i64, self.width.saturating_sub(1) as i64).unwrap_or(self.start);
+        RangeRef { start: self.start, end }.a1()
+    }
+
+    /// The A1 range of the header row.
+    fn header_range(&self) -> String {
+        let end = self.start.offset(0, self.width.saturating_sub(1) as i64).unwrap_or(self.start);
+        RangeRef { start: self.start, end }.a1()
+    }
+
+    /// The A1 range of the last row (the totals row of a financial table).
+    fn last_row_range(&self) -> String {
+        let Some(start) = self.start.offset(self.rows.saturating_sub(1) as i64, 0) else { return self.start.a1() };
+        let end = start.offset(0, self.width.saturating_sub(1) as i64).unwrap_or(start);
+        RangeRef { start, end }.a1()
+    }
+
+    /// The A1 range of one data column, below the header.
+    fn column_range(&self, index: usize) -> Option<String> {
+        let first = if self.header { 1 } else { 0 };
+        let last = self.rows.checked_sub(1)?;
+        if last < first {
+            return None;
+        }
+        let start = self.start.offset(first as i64, index as i64)?;
+        let end = self.start.offset(last as i64, index as i64)?;
+        Some(RangeRef { start, end }.a1())
+    }
+}
+
+/// The header band's fill (a light blue that reads on both themes' grids).
+const HEADER_FILL: &str = "#DDEBF7";
+
+/// Applies the look the user picked. Style is the app's: the answer only says what each column
+/// holds (a closed vocabulary) and whether the last row totals.
+fn apply_preset(s: &mut Session, preset: Preset, shape: &TableShape) -> Result<(), EngineError> {
+    if preset == Preset::None {
+        return Ok(());
+    }
+    if preset != Preset::Raw && shape.header {
+        s.execute("home.formatCells", json!({ "range": shape.header_range(), "style": { "font": { "bold": true } } }))?;
+        s.execute("home.fillColor", json!({ "range": shape.header_range(), "color": HEADER_FILL }))?;
+    }
+    if preset == Preset::Financial {
+        s.execute("view.freezeTopRow", json!({}))?;
+    }
+    if preset != Preset::Raw {
+        for (index, kind) in shape.kinds.iter().enumerate().take(shape.width) {
+            let (Some(mut params), Some(range)) = (number_format(*kind), shape.column_range(index)) else { continue };
+            params["range"] = json!(range);
+            s.execute("home.numberFormat", params)?;
+        }
+    }
+    if shape.total_row && preset != Preset::Raw {
+        s.execute("home.borders", json!({ "range": shape.last_row_range(), "preset": "top", "style": "thin" }))?;
+    }
+    if preset == Preset::Table {
+        s.execute("home.formatAsTable", json!({ "range": shape.range(), "style": "TableStyleMedium2", "header": shape.header }))?;
+    }
+    s.execute("home.autofitColumnWidth", json!({}))?;
+    Ok(())
+}
+
+/// The number format a kind asks for. The kind is the model's label; the format is ours.
+fn number_format(kind: Kind) -> Option<Value> {
+    match kind {
+        Kind::Text => None,
+        Kind::Currency => Some(json!({ "format": "Currency" })),
+        Kind::Percent => Some(json!({ "format": "Percentage" })),
+        Kind::Date => Some(json!({ "format": "Short Date" })),
+        Kind::Month => Some(json!({ "code": "mmm yyyy" })),
+    }
+}
+
+/// The selected table as the classifier needs it: its range, the header row and a text sample.
+struct TableContext {
+    start: CellRef,
+    end: CellRef,
+    range: String,
+    header: String,
+    sample: String,
+}
+
+fn table_context(session: &Session) -> Option<TableContext> {
+    let doc = session.active()?;
+    let range = doc.selection.current();
+    let sheet = doc.wb.sheet(doc.wb.active_sheet())?;
+    let width = range.end.col.saturating_sub(range.start.col) as usize + 1;
+    let rows = range.end.row.saturating_sub(range.start.row) as usize + 1;
+    let row_text = |row: u32| (0..width).map(|col| sheet.input_text(CellRef::new(row, range.start.col + col as u32))).collect::<Vec<_>>().join(" | ");
+    let header = row_text(range.start.row);
+    let mut sample = String::new();
+    for offset in 1..rows.min(9) {
+        sample.push_str(&row_text(range.start.row + offset as u32));
+        sample.push('\n');
+    }
+    Some(TableContext { start: range.start, end: range.end, range: range.a1(), header, sample })
 }
 
 /// The data cells as `range.setValues` takes them, with text that starts with `=` moved out: the
@@ -755,23 +955,49 @@ fn dialog_window(app: &mut SheetApp, ctx: &Context) {
         Dialog::Generate { .. } => language.tr("Generate sheet"),
         Dialog::Fill { .. } => language.tr("Fill column"),
         Dialog::Formula { .. } => language.tr("Formula"),
+        Dialog::Format { .. } => language.tr("Format table"),
     };
     egui::Window::new(title).collapsible(false).resizable(false).default_width(460.0).anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO).show(
         ctx,
         |ui| match &mut dialog {
-            Dialog::Generate { topic, rows, error: dialog_error } => {
+            Dialog::Generate { topic, rows, preset, error: dialog_error } => {
                 ui.label(language.tr("Describe the sheet: a topic, or a whole text to organize."));
                 ui.add(egui::TextEdit::multiline(topic).desired_rows(4).desired_width(f32::INFINITY));
                 ui.horizontal(|ui| {
                     ui.label(language.tr("Rows"));
                     ui.add(egui::DragValue::new(rows).range(1..=200));
                 });
+                preset_picker(ui, preset, language);
                 if let Some(message) = dialog_error.as_ref() {
                     ui.colored_label(ui.visuals().error_fg_color, message);
                 }
                 ui.horizontal(|ui| {
                     if ui.button(language.tr("Generate")).clicked() {
-                        run = Some((Request::GenerateSheet { topic: topic.clone(), rows: *rows }, Apply::Sheet));
+                        run = Some((Request::GenerateSheet { topic: topic.clone(), rows: *rows }, Apply::Sheet { preset: *preset }));
+                    }
+                    if ui.button(language.tr("Cancel")).clicked() {
+                        close = true;
+                    }
+                });
+            }
+            Dialog::Format { preset, start, end, range, header, sample, error: dialog_error } => {
+                ui.label(language.tr("The model reads the table; the preset is what formats it. No data is written."));
+                ui.horizontal(|ui| {
+                    ui.label(language.tr("Range"));
+                    ui.label(RichText::new(range.clone()).monospace());
+                });
+                ui.label(RichText::new(header.clone()).monospace().weak());
+                ui.label(RichText::new(sample.trim_end().to_string()).monospace().weak().small());
+                preset_picker(ui, preset, language);
+                if let Some(message) = dialog_error.as_ref() {
+                    ui.colored_label(ui.visuals().error_fg_color, message);
+                }
+                ui.horizontal(|ui| {
+                    if ui.button(language.tr("Apply")).clicked() {
+                        run = Some((
+                            Request::ClassifyTable { range: range.clone(), header: header.clone(), sample: sample.clone() },
+                            Apply::Table { start: *start, end: *end, preset: *preset },
+                        ));
                     }
                     if ui.button(language.tr("Cancel")).clicked() {
                         close = true;
@@ -858,16 +1084,33 @@ fn dialog_window(app: &mut SheetApp, ctx: &Context) {
 fn set_dialog_error(dialog: &mut Dialog, error: Option<String>) {
     if let Some(message) = error {
         match dialog {
-            Dialog::Generate { error: dialog_error, .. } | Dialog::Fill { error: dialog_error, .. } | Dialog::Formula { error: dialog_error, .. } => {
+            Dialog::Generate { error: dialog_error, .. }
+            | Dialog::Fill { error: dialog_error, .. }
+            | Dialog::Formula { error: dialog_error, .. }
+            | Dialog::Format { error: dialog_error, .. } => {
                 *dialog_error = Some(message);
             }
         }
     }
 }
 
+/// The preset row every artifact dialog has: "None" first (the default), so a look is always
+/// opt-in. The labels are ours; the model never sees the preset.
+fn preset_picker(ui: &mut Ui, preset: &mut Preset, language: crate::i18n::Language) {
+    ui.horizontal(|ui| {
+        ui.label(language.tr("Preset"));
+        for option in Preset::ALL {
+            if ui.selectable_label(*preset == option, language.tr(option.label())).clicked() {
+                *preset = option;
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use localsheets_ai::Column;
     use localsheets_ai::local_ai::{self as la, Msg};
 
     fn no_backend() -> Arc<dyn Backend> {
@@ -888,6 +1131,7 @@ mod tests {
             fetching: None,
             running: None,
             error: None,
+            last: None,
         }
     }
 
@@ -913,10 +1157,11 @@ mod tests {
         let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2 };
         let outcome = Outcome::Sheet {
             title: "Budget".into(),
-            columns: vec!["Item".into(), "Cost".into()],
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
             rows: vec![vec![Cell::Value(json!("Rent")), Cell::Value(json!(1200.0))], vec![Cell::Value(json!("Food")), Cell::Value(json!(400.0))]],
+            total_row: false,
         };
-        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet, outcome), Ok(true));
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::None }, outcome), Ok(true));
         assert_eq!(undo_steps(&session), before + 1, "the whole action is one undo step");
         assert_eq!(value(&mut session, "A1"), json!("Item"));
         assert_eq!(value(&mut session, "B1"), json!("Cost"));
@@ -983,6 +1228,53 @@ mod tests {
         let error = ai.apply(&mut session, &request, Apply::Fill { start, range }, outcome).expect_err("refused");
         assert!(error.contains("doesn't have"), "{error}");
         assert_eq!(value(&mut session, "A1"), Value::Null, "the sheet is untouched");
+    }
+
+    /// The preset is the app's own look: the answer only labels the columns. Header band, a number
+    /// format per kind and the totals row set apart.
+    #[test]
+    fn a_financial_preset_formats_the_answer() {
+        let mut session = session();
+        let mut ai = ai();
+        let request = Request::GenerateSheet { topic: "Budget".into(), rows: 2 };
+        let outcome = Outcome::Sheet {
+            title: "Budget".into(),
+            columns: vec![Column { title: "Item".into(), kind: Kind::Text }, Column { title: "Cost".into(), kind: Kind::Currency }],
+            rows: vec![
+                vec![Cell::Value(json!("Rent")), Cell::Value(json!(1200.0))],
+                vec![Cell::Value(json!("Total")), Cell::Formula("=SUM(B2:B2)".into())],
+            ],
+            total_row: true,
+        };
+        assert_eq!(ai.apply(&mut session, &request, Apply::Sheet { preset: Preset::Financial }, outcome), Ok(true));
+        let a1 = session.execute("cell.get", json!({ "cell": "A1" })).unwrap();
+        assert_eq!(a1["style"]["font"]["bold"], json!(true), "header band: {}", a1["style"]);
+        let b2 = session.execute("cell.get", json!({ "cell": "B2" })).unwrap();
+        assert_ne!(b2["style"]["num_fmt"], json!("General"), "currency column: {}", b2["style"]);
+        let a3 = session.execute("cell.get", json!({ "cell": "A3" })).unwrap();
+        assert!(!a3["style"]["borders"]["top"].is_null(), "totals row set apart: {}", a3["style"]);
+    }
+
+    /// The classifier writes no data: it labels what is selected and the preset formats it.
+    #[test]
+    fn the_classifier_formats_an_existing_table_without_writing_data() {
+        let mut session = session();
+        session
+            .execute("range.setValues", json!({ "range": "A1:C3", "values": [["Item", "Cost", "Share"], ["Rent", 1200, 0.5], ["Total", 1200, 0.5]] }))
+            .unwrap();
+        let mut ai = ai();
+        let request = Request::ClassifyTable { range: "A1:C3".into(), header: String::new(), sample: String::new() };
+        let outcome = Outcome::Table { columns: vec![Kind::Text, Kind::Currency, Kind::Percent], total_row: true };
+        let apply = Apply::Table { start: CellRef::new(0, 0), end: CellRef::new(2, 2), preset: Preset::Financial };
+        assert_eq!(ai.apply(&mut session, &request, apply, outcome), Ok(true));
+        assert_eq!(value(&mut session, "B2"), json!(1200.0), "no value is rewritten");
+        assert_eq!(value(&mut session, "C2"), json!(0.5));
+        for cell in ["B2", "C2"] {
+            let got = session.execute("cell.get", json!({ "cell": cell })).unwrap();
+            assert_ne!(got["style"]["num_fmt"], json!("General"), "{cell} carries its column's format: {}", got["style"]);
+        }
+        let a3 = session.execute("cell.get", json!({ "cell": "A3" })).unwrap();
+        assert!(!a3["style"]["borders"]["top"].is_null(), "totals row set apart: {}", a3["style"]);
     }
 
     /// The suite's gesture: an engine refusal comes back in the dialog, with the user's own
@@ -1068,7 +1360,7 @@ mod tests {
         assert_eq!(pieces, answer);
         let outcome = localsheets_ai::actions::interpret(&request, &answer).unwrap();
         let mut session = session();
-        assert_eq!(ai().apply(&mut session, &request, Apply::Sheet, outcome), Ok(true));
+        assert_eq!(ai().apply(&mut session, &request, Apply::Sheet { preset: Preset::None }, outcome), Ok(true));
         assert_eq!(value(&mut session, "A2"), json!("Rent"));
     }
 }

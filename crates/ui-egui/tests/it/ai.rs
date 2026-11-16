@@ -28,7 +28,7 @@ fn harness() -> Harness {
 #[test]
 fn the_ai_tab_offers_the_three_actions_and_connections() {
     let h = harness();
-    for label in ["Generate Sheet", "Fill Column", "Formula", "Connections"] {
+    for label in ["Generate Sheet", "Fill Column", "Formula", "Format Table", "Connections"] {
         assert!(h.query_by_label(label).is_some(), "{label} is missing from the AI tab");
     }
 }
@@ -42,6 +42,25 @@ fn generate_opens_its_dialog() {
     // The dialog's own labels: the description field and the row count.
     assert!(h.query_by_label("Describe the sheet: a topic, or a whole text to organize.").is_some());
     assert!(h.query_by_label("Generate").is_some(), "the dialog's own button is painted");
+}
+
+/// The suite's "repeat" gesture: the dialog comes back with the last request's topic, rows and
+/// preset, so asking again is one click.
+#[test]
+fn the_generate_dialog_comes_back_prefilled() {
+    let mut h = harness();
+    h.state_mut().ai.last =
+        Some(localsheets_ui_egui::ai::LastGenerate { topic: "Budget".into(), rows: 4, preset: localsheets_ai::Preset::Financial });
+    h.get_by_label("Generate Sheet").click();
+    h.run_steps(3);
+    match &h.state().ai.dialog {
+        Some(Dialog::Generate { topic, rows, preset, .. }) => {
+            assert_eq!(topic, "Budget");
+            assert_eq!(*rows, 4);
+            assert_eq!(*preset, localsheets_ai::Preset::Financial);
+        }
+        _ => panic!("the generate dialog is open"),
+    }
 }
 
 #[test]

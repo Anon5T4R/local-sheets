@@ -57,7 +57,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Format Cells…" => "Formatar Células…",
         "Format Cell Alignment…" => "Formatar Alinhamento de Células…",
         "Format\nPane" => "Painel de\nFormatação",
-        "Format" => "Formatar",
+        "Apply" => "Formatar",
         "Insert" => "Inserir",
         "Insert Cells…" => "Inserir Células…",
         "Delete" => "Excluir",
@@ -1037,6 +1037,16 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Cell" => "Célula",
         "Ask for the formula in plain language." => "Peça a fórmula em linguagem natural.",
         "Write formula" => "Escrever fórmula",
+        "Preset" => "Estilo",
+        "Simple table" => "Tabela simples",
+        "Raw data" => "Dados puros",
+        "Format table" => "Formatar tabela",
+        "Range" => "Intervalo",
+        "The model reads the table; the preset is what formats it. No data is written." => {
+            "O modelo lê a tabela; o estilo é o que formata. Nenhum dado é escrito."
+        }
+        "Format\nTable" => "Formatar\ntabela",
+        "Format the selected table with a preset" => "Formata a tabela selecionada com um estilo",
         _ => return None,
     })
 }

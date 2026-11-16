@@ -1186,6 +1186,17 @@ pub(super) const EXTRA: &[(&str, &str)] = &[
     ("Cell", "セル"),
     ("Ask for the formula in plain language.", "数式を日常の言葉で指示してください。"),
     ("Write formula", "数式を書き込む"),
+    ("Preset", "スタイル"),
+    ("Simple table", "シンプルな表"),
+    ("Raw data", "データのみ"),
+    ("Format table", "表の書式"),
+    ("Range", "範囲"),
+    (
+        "The model reads the table; the preset is what formats it. No data is written.",
+        "モデルは表を読むだけで、書式を付けるのはスタイルです。データは書き込みません。",
+    ),
+    ("Format\nTable", "表を\n書式設定"),
+    ("Format the selected table with a preset", "選択した表をスタイルで書式設定します"),
 ];
 
 /// Translates an interface label; `None` for a label the catalog does not know, so `i18n.rs` can

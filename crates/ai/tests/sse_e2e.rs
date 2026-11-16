@@ -77,9 +77,10 @@ fn a_streamed_sheet_answer_becomes_an_outcome() {
 
     let request = localsheets_ai::Request::GenerateSheet { topic: "medicamentos".into(), rows: 5 };
     match localsheets_ai::actions::interpret(&request, &answer).expect("the answer is a sheet") {
-        localsheets_ai::Outcome::Sheet { title, columns, rows } => {
+        localsheets_ai::Outcome::Sheet { title, columns, rows, .. } => {
             assert_eq!(title, "Medicamentos");
-            assert_eq!(columns, ["Nome", "Dose"]);
+            let titles: Vec<&str> = columns.iter().map(|column| column.title.as_str()).collect();
+            assert_eq!(titles, ["Nome", "Dose"]);
             assert_eq!(rows.len(), 2);
         }
         other => panic!("expected a sheet, got {other:?}"),

@@ -12,6 +12,9 @@ pub(super) fn ai(app: &mut SheetApp, ui: &mut Ui) {
     if big_button(ui, Icon::Function, "Formula", "Ask for the current cell's formula in plain language", false).clicked() {
         app.ai.open_formula(&app.session);
     }
+    if big_button(ui, Icon::FormatTable, "Format\nTable", "Format the selected table with a preset", false).clicked() {
+        app.ai.open_format(&app.session);
+    }
     if big_button(ui, Icon::Settings, "Connections", "AI providers, keys and models", false).clicked() {
         app.ai.panel = true;
     }
