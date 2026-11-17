@@ -6,10 +6,10 @@
 //! localsheets-cli eval <formula> [--in FILE] [--sheet S] [--cell A1] [--json]
 //! localsheets-cli cat <file> [--range A1:D20] [--sheet S] [--formulas] [--csv]
 //! localsheets-cli check <file-or-dir>... [--json] [--tolerance 1e-9] [--max-report N]
-//! localsheets-cli run [--in FILE | --sample NAME] [--cmd 'id={json}']... [--script FILE.jsonl] [--out FILE] [--print RANGE] [--quiet]
+//! localsheets-cli run [--in FILE | --sample NAME] [--cmd 'id={json}']... [--script FILE] [--out FILE] [--print RANGE] [--quiet]
 //! localsheets-cli commands [--json] [--search X]
 //! localsheets-cli functions [--json] [--search X] [--category C]
-//! localsheets-cli mcp [--connect PORT] [--in FILE | --sample NAME]
+//! localsheets-cli mcp [--connect PORT|HOST:PORT] [--in FILE | --sample NAME]
 //! localsheets-cli send <port> <method> [json]
 //! localsheets-cli version | --version
 //! ```
@@ -41,13 +41,16 @@ const USAGE: &str = "usage:
   localsheets-cli cat <file> [--range A1:D20] [--sheet S] [--formulas] [--csv]
   localsheets-cli check <file-or-dir>... [--json] [--tolerance 1e-9] [--max-report N]
                      cached-value calc oracle + XLSX round-trip fidelity (exit 1 on any difference)
-  localsheets-cli run [--in FILE | --sample NAME] [--cmd 'id={json}']... [--script FILE.jsonl]
+  localsheets-cli run [--in FILE | --sample NAME] [--cmd 'id={json}']... [--script FILE.json]
                      [--out FILE] [--print RANGE] [--quiet]
-                     a script line is id={json} or {\"command\": \"id\", \"params\": {…}};
+                     a script is a JSON array of steps, or one step per line (JSON Lines);
+                     a step is id={json} or {\"command\": \"id\", \"params\": {…}};
                      blank lines and lines starting with # or // are skipped
   localsheets-cli commands [--json] [--search X]
   localsheets-cli functions [--json] [--search X] [--category C]
-  localsheets-cli mcp [--connect PORT] [--in FILE | --sample NAME]
+  localsheets-cli mcp [--connect PORT|HOST:PORT] [--in FILE | --sample NAME]
+                     --connect is loopback only (a bare PORT means 127.0.0.1); the app's
+                     control token is read from its file or LOCALSHEETS_CONTROL_TOKEN
   localsheets-cli send <port> <method> [json]
   localsheets-cli version";
 
@@ -431,10 +434,27 @@ fn run(args: &[String]) -> Result<(), String> {
             "cmd" => parse_command(value)?.map(|(id, p)| vec![(id, p, "--cmd".to_string())]).unwrap_or_default(),
             "script" => {
                 let text = std::fs::read_to_string(value).map_err(|e| format!("{value}: {e}"))?;
+                let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
                 let mut v = Vec::new();
-                for (i, line) in text.lines().enumerate() {
-                    if let Some((id, p)) = parse_command(line).map_err(|e| format!("{value}:{}: {e}", i + 1))? {
-                        v.push((id, p, format!("{value}:{}", i + 1)));
+                // A JSON array of steps (`["cell.set {…}", {"command": "file.save"}]`), or one
+                // step per line (JSON Lines), as the rest of the suite takes job files.
+                if text.trim_start().starts_with('[') {
+                    let list: Value = serde_json::from_str(text).map_err(|e| format!("{value}: {e}"))?;
+                    let entries = list.as_array().ok_or_else(|| format!("{value}: not a JSON array"))?;
+                    for (i, entry) in entries.iter().enumerate() {
+                        let line = match entry {
+                            Value::String(s) => s.clone(),
+                            other => other.to_string(),
+                        };
+                        let (id, p) =
+                            parse_command(&line).map_err(|e| format!("{value}[{i}]: {e}"))?.ok_or_else(|| format!("{value}[{i}]: empty step"))?;
+                        v.push((id, p, format!("{value}[{i}]")));
+                    }
+                } else {
+                    for (i, line) in text.lines().enumerate() {
+                        if let Some((id, p)) = parse_command(line).map_err(|e| format!("{value}:{}: {e}", i + 1))? {
+                            v.push((id, p, format!("{value}:{}", i + 1)));
+                        }
                     }
                 }
                 v
@@ -525,12 +545,14 @@ fn functions(args: &[String]) -> Result<(), String> {
 /// `mcp` (headless, in-process engine) or `mcp --connect PORT|HOST:PORT` (drive a running app
 /// started with `localsheets --control PORT`). JSON-RPC on stdin/stdout; logs on stderr.
 fn mcp(args: &[String]) -> Result<(), String> {
-    use localsheets_mcp::{Backend, Headless, Remote, Server, control_addr};
+    use localsheets_mcp::{Backend, Headless, Remote, Server};
     let a = Args::parse(args, &["connect", "in", "sample"], &[])?;
     a.no_extra(0)?;
     let backend: Box<dyn Backend> = match a.opt("connect") {
         Some(c) => {
-            let addr = control_addr(c);
+            // The suite's `--connect`: a bare port means loopback, and a host that isn't loopback
+            // is refused before any connection (the control token only goes to 127.0.0.1).
+            let addr = craft_mcp::remote::normalize_addr(c).map_err(|e| format!("mcp: {e}"))?;
             Box::new(
                 Remote::connect(&addr)
                     .map_err(|e| format!("cannot connect to the Local Sheets app at {addr}: {e} (start it with `localsheets --control PORT`)"))?,

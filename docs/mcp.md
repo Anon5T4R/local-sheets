@@ -9,7 +9,7 @@ Two backends:
 | Mode | Command | What it drives |
 |---|---|---|
 | Headless (default) | `localsheets-cli mcp [--in book.xlsx \| --sample budget]` | An in-process engine session — no window. |
-| Remote | `localsheets-cli mcp --connect 7979` | A running app started with `localsheets --control 7979` (TCP JSON lines on `127.0.0.1`, authenticated with the app's token: it is read from the app's token file or `LOCALSHEETS_CONTROL_TOKEN`, see [`control-protocol.md`](control-protocol.md)). |
+| Remote | `localsheets-cli mcp --connect 7979` (or `HOST:PORT`) | A running app started with `localsheets --control 7979` (TCP JSON lines on `127.0.0.1`, authenticated with the app's token: it is read from the app's token file or `LOCALSHEETS_CONTROL_TOKEN`, see [`control-protocol.md`](control-protocol.md)). A bare port means `127.0.0.1`; a host that isn't loopback is refused before anything connects. |
 
 ## Claude Code
 
@@ -65,6 +65,13 @@ Every tool that acts on a workbook (all but `list_commands`, `list_functions`, `
 Results are one text block holding pretty JSON; failures set `isError: true` with a readable message. Unknown tools,
 missing required arguments and wrong argument types are JSON-RPC `-32602` errors; malformed JSON is `-32700`; unknown
 methods `-32601`.
+
+## File confinement
+
+This app does **not** accept the suite's `--automation-read-root` / `--automation-write-root` yet:
+a tool may open and write the paths it is given. The flags are the suite contract and are tracked as
+debt here; until they land, confine the process with the operating system or point the agent at a
+folder it owns.
 
 ## Resources
 

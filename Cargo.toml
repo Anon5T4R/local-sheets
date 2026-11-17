@@ -38,6 +38,9 @@ local-ai = { path = "libs/local-ai" }
 # rejects git sources.
 # craft-update: app-specific pretend versions apply to startup and manual checks.
 craft-update = { path = "libs/craft-libs/crates/update/", version = "=0.1.0", features = ["egui", "icons"] }
+# Shared MCP plumbing of the suite (stdio server skeleton, script/batch steps and the automation
+# root flags); source of truth in local-libs, vendored here and replicated by its sync.ps1.
+craft-mcp = { path = "libs/craft-libs/crates/mcp/" }
 
 # foundation
 thiserror = "2"

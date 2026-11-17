@@ -1057,6 +1057,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-mcp"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "craft-print"
 version = "0.1.0"
 dependencies = [
@@ -3110,6 +3117,7 @@ dependencies = [
 name = "localsheets-cli"
 version = "0.2.3"
 dependencies = [
+ "craft-mcp",
  "localsheets-engine",
  "localsheets-mcp",
  "log",

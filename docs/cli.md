@@ -38,7 +38,7 @@ cargo install --path apps/localsheets-cli     # or: cargo run -p localsheets-cli
 
 ```sh
 localsheets-cli run [--in FILE | --sample budget|sales|grades] \
-    [--cmd 'id={json}']... [--script steps.jsonl] \
+    [--cmd 'id={json}']... [--script steps.json] \
     [--out FILE] [--print RANGE|used] [--sheet S] [--csv] [--formulas] [--quiet]
 ```
 
@@ -46,8 +46,10 @@ Opens a file (or a sample, or a blank workbook), runs `--cmd` and `--script` ste
 `--out` and prints each `--print` range. Each non-null command result is printed as a JSON line unless `--quiet`.
 The first failing step stops the run with a non-zero exit.
 
-A `--cmd` is `id`, `id={json}` or `id {json}`. A script has one command per line in the same forms, or as JSON objects
-`{"command": "cell.set", "params": {...}}`; blank lines and `#` comments are skipped.
+A `--cmd` is `id`, `id={json}` or `id {json}`. A script is a JSON array of steps
+(`["file.new", {"command": "cell.set", "params": {...}}]`) or one command per line in the same
+forms, or JSON objects `{"command": "cell.set", "params": {...}}`; blank lines and `#` comments are
+skipped. Arrays name a bad step by its index (`book.json[2]`), lines by their number (`steps.jsonl:3`).
 
 ```sh
 localsheets-cli run --in book.xlsx \
