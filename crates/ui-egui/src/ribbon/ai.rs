@@ -15,7 +15,10 @@ pub(super) fn ai(app: &mut SheetApp, ui: &mut Ui) {
     if big_button(ui, Icon::FormatTable, "Format\nTable", "Format the selected table with a preset", false).clicked() {
         app.ai.open_format(&app.session);
     }
+    if big_button(ui, Icon::Comment, "AI\nAssistant", "Ask about the selected table, beside the grid", false).clicked() {
+        app.ai.chat_open = !app.ai.chat_open;
+    }
     if big_button(ui, Icon::Settings, "Connections", "AI providers, keys and models", false).clicked() {
-        app.ai.panel = true;
+        app.ai.settings_open = true;
     }
 }

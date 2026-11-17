@@ -550,6 +550,25 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         }
         "Format\nTable" => "Formato de\ntabla",
         "Format the selected table with a preset" => "Da formato a la tabla seleccionada con un estilo",
+        // La superficie de IA de la suite (craft-ai-ui): el formulario de conexiones y el asistente.
+        "AI connection" => "Conexión de IA",
+        "AI assistant" => "Asistente de IA",
+        "AI\nAssistant" => "Asistente\nde IA",
+        "Ask about the selected table, beside the grid" => "Pregunta sobre la tabla seleccionada, junto a la cuadrícula",
+        "Ask about the selected table, or about anything." => "Pregunta sobre la tabla seleccionada, o sobre cualquier cosa.",
+        "Configure a connection first." => "Configura primero una conexión.",
+        "Write to the assistant." => "Escribe al asistente.",
+        "Insert into the cell" => "Insertar en la celda",
+        "To the end" => "Al final",
+        "Send" => "Enviar",
+        "Retry" => "Reintentar",
+        "Settings" => "Configuración",
+        "characters" => "caracteres",
+        "turns" => "turnos",
+        "cut from " => "recortado de ",
+        "Empty uses the provider's own address." => "Vacío usa la dirección del propio proveedor.",
+        "No AI connection yet. Open AI > Connections and add one." => "Todavía no hay conexión de IA. Abre IA > Conexiones y añade una.",
+        "Another AI request is still running. Stop it or wait for it." => "Otra solicitud de IA sigue en curso. Deténla o espera.",
         _ => return None,
     })
 }

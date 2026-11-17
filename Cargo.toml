@@ -41,6 +41,9 @@ craft-update = { path = "libs/craft-libs/crates/update/", version = "=0.1.0", fe
 # Shared MCP plumbing of the suite (stdio server skeleton, script/batch steps and the automation
 # root flags); source of truth in local-libs, vendored here and replicated by its sync.ps1.
 craft-mcp = { path = "libs/craft-libs/crates/mcp/" }
+# The suite's AI surface (connections form, status strip, chat panel and the window policy); source
+# of truth in local-libs, vendored here and replicated by its sync.ps1.
+craft-ai-ui = { path = "libs/craft-libs/crates/ai-ui/" }
 
 # foundation
 thiserror = "2"

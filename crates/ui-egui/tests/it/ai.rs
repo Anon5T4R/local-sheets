@@ -26,9 +26,9 @@ fn harness() -> Harness {
 }
 
 #[test]
-fn the_ai_tab_offers_the_three_actions_and_connections() {
+fn the_ai_tab_offers_the_four_actions_the_assistant_and_connections() {
     let h = harness();
-    for label in ["Generate Sheet", "Fill Column", "Formula", "Format Table", "Connections"] {
+    for label in ["Generate Sheet", "Fill Column", "Formula", "Format Table", "AI Assistant", "Connections"] {
         assert!(h.query_by_label(label).is_some(), "{label} is missing from the AI tab");
     }
 }
@@ -73,12 +73,24 @@ fn fill_column_opens_its_dialog_for_the_selection() {
 }
 
 #[test]
-fn connections_opens_the_panel() {
+fn connections_opens_the_form() {
     let mut h = harness();
     h.get_by_label("Connections").click();
     h.run_steps(3);
-    assert!(h.state().ai.panel, "the connections panel is open");
-    assert!(h.query_by_label("Add connection").is_some(), "the panel offers a new connection");
+    assert!(h.state().ai.settings_open, "the connections form is open");
+    assert!(h.query_by_label("Save").is_some(), "the form offers the save");
+}
+
+/// The AI assistant is a panel beside the grid: the ribbon opens it, and it carries the suite's own
+/// composer, with the connection's state named.
+#[test]
+fn the_assistant_panel_opens_from_the_ribbon() {
+    let mut h = harness();
+    h.get_by_label("AI Assistant").click();
+    h.run_steps(3);
+    assert!(h.state().ai.chat_open, "the assistant panel is open");
+    assert!(h.query_by_label("AI assistant").is_some(), "the panel's own title is painted");
+    assert!(h.query_by_label("Send").is_some(), "the composer is painted");
 }
 
 /// The column the model used to invent (bug of 2026-11-18): a formula column is painted as the

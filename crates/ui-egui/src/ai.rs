@@ -1,18 +1,24 @@
-//! The AI surface: connections, the three sheet actions, the status strip and the dialogs.
+//! The AI surface: the suite's connections form and chat panel, plus this app's four sheet actions,
+//! their dialogs and the action strip.
 //!
 //! Everything the user configures is a [`local_ai::Connection`] (provider preset, base URL, model)
 //! plus a key that lives in the OS keychain. The actions turn the sheet around the selection into a
 //! [`Request`], the model streams an answer, and [`localsheets_ai::actions::interpret`] turns it into
 //! an [`Outcome`] that is applied through the engine's own commands inside **one undo group** - so a
 //! failed apply rolls back and the `.xlsx` is never written by the AI directly.
+//!
+//! The connections form, the chat panel and the chat's strip are `craft_ai_ui` (the suite's AI
+//! surface, shared with the other apps). What the app adds is what only the app knows: the system
+//! prompt, the selection's table as the chat's context, the four sheet actions and how an answer is
+//! applied.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 
+use craft_ai_ui as ai_ui;
 use egui::{Context, RichText, Ui};
-use localsheets_ai::local_ai::{self, Connection};
+use localsheets_ai::local_ai::{self, Connection, Msg};
 use localsheets_ai::{AI_APP_ID, AI_APP_URL, Backend, Cell, Kind, LiveBackend, Outcome, Preset, Request};
 use localsheets_engine::EngineError;
 use localsheets_engine::Session;
@@ -20,6 +26,7 @@ use localsheets_engine::core::{CellRef, MAX_COLS, MAX_ROWS, RangeRef};
 use serde_json::{Value, json};
 
 use crate::SheetApp;
+use crate::i18n::Language;
 
 /// What a worker thread reports back.
 enum Event {
@@ -59,14 +66,16 @@ struct Running {
     cancelled: Arc<AtomicBool>,
 }
 
-/// A connection being edited (new or existing).
-pub struct Draft {
-    pub id: String,
-    pub provider: String,
-    pub label: String,
-    pub base_url: String,
-    pub model: String,
-    pub key: String,
+/// How much of the selection's table goes as the chat's context: its region, not the sheet.
+const CONTEXT_LIMIT: usize = 12_000;
+
+/// The whole request budget: the turns plus the table.
+const BUDGET_CHARS: usize = 24_000;
+
+/// The chat request in flight: the worker's channel and the flag that drops a stopped answer.
+struct ChatRunning {
+    rx: Receiver<Event>,
+    cancelled: Arc<AtomicBool>,
 }
 
 /// One of the action dialogs.
@@ -108,14 +117,19 @@ pub enum Dialog {
 /// The AI state the window owns.
 pub struct Ai {
     pub backend: Arc<dyn Backend>,
-    pub connections: Vec<Connection>,
-    pub active: Option<String>,
-    pub keys: HashMap<String, bool>,
-    keys_loaded: bool,
-    pub panel: bool,
+    /// The connection in use, from the suite's store (one, like the other apps of the suite).
+    connection: Option<Connection>,
+    /// Whether the connections form is open.
+    pub settings_open: bool,
+    connections: ai_ui::ConnectionsPanel,
+    /// The chat: the suite's panel, with the selection's table as its context.
+    chat: ai_ui::ChatPanel,
+    /// The chat's strip (spinner, seconds, the stream's tail and Stop).
+    strip: ai_ui::StatusStrip,
+    /// Whether the chat is open (it takes width from the grid).
+    pub chat_open: bool,
+    chat_running: Option<ChatRunning>,
     pub dialog: Option<Dialog>,
-    pub draft: Option<Draft>,
-    pub models: Option<Vec<String>>,
     fetching: Option<Receiver<Result<Vec<String>, String>>>,
     running: Option<Running>,
     pub error: Option<String>,
@@ -127,24 +141,28 @@ impl Default for Ai {
     fn default() -> Self {
         let app = local_ai::App { id: AI_APP_ID, url: AI_APP_URL };
         let mut error = None;
-        let connections = match Connection::load_all(&app) {
-            Ok(connections) => connections,
+        // One connection per app, the suite's standard: the first of the store is the one in use.
+        let connection = match Connection::load_all(&app) {
+            Ok(connections) => connections.into_iter().next(),
             Err(e) => {
                 error = Some(format!("the AI connections could not be read: {e}"));
-                Vec::new()
+                None
             }
         };
-        let active = connections.first().map(|connection| connection.id.clone());
+        let mut chat = ai_ui::ChatPanel::default();
+        // The last 8 turns and one budget for everything that leaves: the table plus the
+        // conversation.
+        chat.set_policy(ai_ui::WindowPolicy { turns: ai_ui::Turns::LastN(8), total_budget_chars: BUDGET_CHARS });
         Self {
             backend: Arc::new(LiveBackend::new(AI_APP_ID, AI_APP_URL)),
-            connections,
-            active,
-            keys: HashMap::new(),
-            keys_loaded: false,
-            panel: false,
+            connection,
+            settings_open: false,
+            connections: ai_ui::ConnectionsPanel::default(),
+            chat,
+            strip: ai_ui::StatusStrip::default(),
+            chat_open: false,
+            chat_running: None,
             dialog: None,
-            draft: None,
-            models: None,
             fetching: None,
             running: None,
             error,
@@ -158,50 +176,35 @@ impl Ai {
         local_ai::App { id: AI_APP_ID, url: AI_APP_URL }
     }
 
-    fn active_connection(&self) -> Option<&Connection> {
-        self.active.as_ref().and_then(|id| self.connections.iter().find(|connection| &connection.id == id))
+    /// The model in use, for the panel's header.
+    pub(crate) fn model(&self) -> &str {
+        self.connection.as_ref().map(|connection| connection.model.as_str()).unwrap_or_default()
     }
 
-    /// Re-reads the keychain for every connection (the panel calls this once when it opens).
-    fn refresh_keys(&mut self) {
-        let app = Self::app();
-        self.keys.clear();
-        for connection in &self.connections {
-            self.keys.insert(connection.id.clone(), connection.has_key(&app));
-        }
-        self.keys_loaded = true;
+    /// Whether the panel has somewhere to send a question.
+    pub(crate) fn ready(&self) -> bool {
+        self.connection.as_ref().is_some_and(|connection| !connection.model.trim().is_empty())
+    }
+
+    /// Whether an AI request is in flight (the actions and the chat take turns).
+    pub(crate) fn busy(&self) -> bool {
+        self.running.is_some() || self.chat_running.is_some()
     }
 
     /// Starts one request on a worker thread. `lang` picks the prompt language.
     pub(crate) fn start(&mut self, ctx: &Context, request: Request, apply: Apply, lang: &str) -> Result<(), String> {
-        let Some(connection) = self.active_connection().cloned() else {
-            return Err("No AI connection yet. Open AI > Connections and add one.".into());
+        if self.busy() {
+            return Err(tr(ctx, "Another AI request is still running. Stop it or wait for it.").to_string());
+        }
+        let Some(connection) = self.connection.clone() else {
+            return Err(tr(ctx, "No AI connection yet. Open AI > Connections and add one.").to_string());
         };
         let messages = localsheets_ai::actions::messages(&request, lang)?;
         // Remember the request, so the dialog can come back pre-filled (repeat).
         if let (Request::GenerateSheet { topic, rows, .. }, Apply::Sheet { preset, .. }) = (&request, &apply) {
             self.last = Some(LastGenerate { topic: topic.clone(), rows: *rows, preset: *preset });
         }
-        let (tx, rx) = mpsc::channel();
-        let backend = self.backend.clone();
-        let cancelled = Arc::new(AtomicBool::new(false));
-        let worker_cancelled = cancelled.clone();
-        let worker_ctx = ctx.clone();
-        std::thread::Builder::new()
-            .name("localsheets-ai".into())
-            .spawn(move || {
-                let mut on_delta = |delta: &str| {
-                    if worker_cancelled.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let _ = tx.send(Event::Delta(delta.to_string()));
-                    worker_ctx.request_repaint();
-                };
-                let result = backend.stream(&connection, &messages, &mut on_delta);
-                let _ = tx.send(Event::Done(result));
-                worker_ctx.request_repaint();
-            })
-            .map_err(|e| format!("the AI worker could not start: {e}"))?;
+        let (rx, cancelled) = spawn_stream(self.backend.clone(), ctx, connection, messages)?;
         self.error = None;
         self.running = Some(Running { request, apply, rx, started_ms: crate::clock::monotonic_ms(), partial: String::new(), cancelled });
         Ok(())
@@ -215,10 +218,91 @@ impl Ai {
         }
     }
 
-    /// Polls the worker and the model fetch; applies a finished outcome. Returns true when a
+    /// Sends what the chat's composer holds, through the same client the actions use.
+    fn chat_send(&mut self, ctx: &Context) {
+        if self.busy() {
+            return;
+        }
+        let Some(lines) = self.chat.take_request() else { return };
+        let Some(connection) = self.connection.clone() else {
+            self.chat.finish(Err(tr(ctx, "No AI connection yet. Open AI > Connections and add one.").to_string()));
+            return;
+        };
+        let messages: Vec<Msg> = lines
+            .into_iter()
+            .map(|line| match line.role {
+                ai_ui::Role::System => Msg::System(line.text),
+                ai_ui::Role::User => Msg::User(line.text),
+                ai_ui::Role::Assistant => Msg::Assistant(line.text),
+            })
+            .collect();
+        match spawn_stream(self.backend.clone(), ctx, connection, messages) {
+            Ok((rx, cancelled)) => {
+                self.strip.begin();
+                self.chat_running = Some(ChatRunning { rx, cancelled });
+            }
+            Err(error) => self.chat.finish(Err(error)),
+        }
+    }
+
+    /// Stops the chat's answer: what arrived stays as a turn, and nothing is applied.
+    fn chat_stop(&mut self) {
+        if let Some(running) = self.chat_running.take() {
+            running.cancelled.store(true, Ordering::Relaxed);
+        }
+        self.strip.finish();
+        self.chat.stopped();
+    }
+
+    /// What the chat's worker delivered since the last frame.
+    fn tick_chat(&mut self) {
+        let mut deltas = String::new();
+        let mut finished = None;
+        {
+            let Some(running) = self.chat_running.as_ref() else { return };
+            loop {
+                match running.rx.try_recv() {
+                    Ok(Event::Delta(delta)) => deltas.push_str(&delta),
+                    Ok(Event::Done(result)) => {
+                        finished = Some(result);
+                        break;
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        finished = Some(Err("the AI worker stopped".into()));
+                        break;
+                    }
+                }
+            }
+        }
+        if !deltas.is_empty() {
+            self.strip.push(&deltas);
+            self.chat.push(&deltas);
+        }
+        let Some(result) = finished else { return };
+        self.strip.finish();
+        self.chat.finish(result);
+        self.chat_running = None;
+    }
+
+    /// Writes the last answer into the active cell as **text**: an answer that starts with `=` stays
+    /// text (anti-sorcery - a formula is only ever the Formula action, validated by the engine).
+    fn insert_answer(&mut self, session: &mut Session) -> bool {
+        let Some(answer) = self.chat.last_answer().map(str::trim).map(str::to_string) else { return false };
+        if answer.is_empty() {
+            return false;
+        }
+        let Some(doc) = session.active() else { return false };
+        let at = doc.selection.active;
+        let input = if answer.starts_with('=') { format!("'{answer}") } else { answer };
+        session.execute("cell.set", json!({ "cell": at.a1(), "input": input })).is_ok()
+    }
+
+    /// Polls the workers and the model fetch; applies a finished outcome. Returns true when a
     /// command changed the workbook (the window then brings it into view).
     pub(crate) fn tick(&mut self, session: &mut Session) -> bool {
         self.tick_models();
+        self.tick_chat();
         let Some(running) = self.running.as_mut() else { return false };
         let mut finished = None;
         loop {
@@ -295,16 +379,77 @@ impl Ai {
         let Some(rx) = &self.fetching else { return };
         match rx.try_recv() {
             Ok(Ok(models)) => {
-                self.models = Some(models);
+                self.connections.models = models;
                 self.fetching = None;
             }
             Ok(Err(error)) => {
-                self.error = Some(error);
+                self.connections.failed(error);
                 self.fetching = None;
             }
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => self.fetching = None,
         }
+    }
+
+    /// The connections form: the suite's dialog, with this app's store and keychain behind it.
+    fn settings(&mut self, ctx: &Context, language: Language) {
+        if !self.settings_open {
+            self.connections.open = false;
+            return;
+        }
+        if !self.connections.open {
+            self.connections.set_presets(presets());
+            self.connections.open_with(self.connection.as_ref().map(draft_of));
+        }
+        let labels = form_labels(language);
+        match self.connections.show(ctx, &labels) {
+            ai_ui::ConnectionsIntent::None => {}
+            ai_ui::ConnectionsIntent::Cancel => {
+                self.connections.open = false;
+                self.settings_open = false;
+            }
+            ai_ui::ConnectionsIntent::Save(draft, key) => self.save(draft, key),
+            ai_ui::ConnectionsIntent::LoadModels(draft, key) => self.fetch_models(ctx, draft, key),
+        }
+    }
+
+    /// Stores the connection (the key in the keychain) and keeps it in use.
+    fn save(&mut self, draft: ai_ui::ConnectionDraft, key: String) {
+        let app = Self::app();
+        let connection = connection_of(&draft);
+        if !key.is_empty()
+            && let Err(error) = connection.set_key(&app, &key)
+        {
+            self.connections.failed(format!("the key could not be saved: {error}"));
+            return;
+        }
+        match Connection::save_all(&app, std::slice::from_ref(&connection)) {
+            Ok(()) => {
+                self.connection = Some(connection);
+                self.chat.clear();
+                self.connections.saved();
+                self.settings_open = false;
+            }
+            Err(error) => self.connections.failed(error),
+        }
+    }
+
+    /// Asks the provider for its model list, on a worker thread (the key as typed, or the saved one).
+    fn fetch_models(&mut self, ctx: &Context, draft: ai_ui::ConnectionDraft, key: String) {
+        if self.fetching.is_some() {
+            return;
+        }
+        let app = Self::app();
+        let connection = connection_of(&draft);
+        let key = if key.is_empty() { connection.key(&app).unwrap_or_default() } else { key };
+        let (tx, rx) = mpsc::channel();
+        let worker = ctx.clone();
+        std::thread::spawn(move || {
+            let result = local_ai::list_models_with_key(&app, &connection, &key);
+            let _ = tx.send(result);
+            worker.request_repaint();
+        });
+        self.fetching = Some(rx);
     }
 
     /// Applies one outcome through the engine's commands. `Ok(true)` = the workbook changed,
@@ -839,208 +984,179 @@ pub(crate) fn status_strip(app: &mut SheetApp, ui: &mut Ui) {
 
 /// The connections window and the action dialogs, drawn last so they sit above the grid.
 pub(crate) fn windows(app: &mut SheetApp, ctx: &Context) {
-    connections_window(app, ctx);
+    let language = app.ui.language;
+    app.ai.settings(ctx, language);
     dialog_window(app, ctx);
 }
 
-fn connections_window(app: &mut SheetApp, ctx: &Context) {
-    if !app.ai.panel {
+/// The chat beside the grid: the suite's panel over this app's conversation.
+pub(crate) fn chat_panel(app: &mut SheetApp, ui: &mut Ui) {
+    if !app.ai.chat_open {
         return;
     }
-    if !app.ai.keys_loaded {
-        app.ai.refresh_keys();
-    }
-    let mut open = true;
-    let mut add = false;
-    let mut edit: Option<Connection> = None;
-    let mut delete: Option<String> = None;
-    let mut activate: Option<String> = None;
-    let mut save = false;
-    let mut fetch = false;
-    let mut close_draft = false;
+    let ctx = ui.ctx().clone();
     let language = app.ui.language;
-    egui::Window::new(language.tr("AI connections"))
-        .open(&mut open)
-        .collapsible(false)
-        .resizable(false)
-        .default_width(540.0)
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(ctx, |ui| {
-            ui.label(RichText::new(language.tr("The key lives in the OS keychain; the connection file never holds it.")).weak());
-            ui.add_space(4.0);
-            if app.ai.connections.is_empty() {
-                ui.label(language.tr("No connections yet."));
-            }
-            for connection in &app.ai.connections {
-                ui.horizontal(|ui| {
-                    let active = app.ai.active.as_deref() == Some(connection.id.as_str());
-                    if ui.selectable_label(active, format!("{} · {} · {}", connection.label, connection.provider, connection.model)).clicked() {
-                        activate = Some(connection.id.clone());
-                    }
-                    if app.ai.keys.get(&connection.id).copied().unwrap_or(false) {
-                        ui.label(RichText::new(language.tr("key saved")).weak());
-                    }
-                    if ui.small_button(language.tr("Edit")).clicked() {
-                        edit = Some(connection.clone());
-                    }
-                    if ui.small_button(language.tr("Delete")).clicked() {
-                        delete = Some(connection.id.clone());
-                    }
-                });
-            }
-            ui.add_space(6.0);
-            if ui.button(language.tr("Add connection")).clicked() {
-                add = true;
-            }
-            if let Some(draft) = app.ai.draft.as_mut() {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.label(language.tr("Provider"));
-                    craft_ui::ComboBox::from_id_salt("ai-provider").selected_text(draft.provider.clone()).show_ui(ui, |ui| {
-                        for provider in local_ai::PROVIDERS {
-                            if ui.selectable_label(draft.provider == provider.id, provider.label).clicked() {
-                                draft.provider = provider.id.to_string();
-                                if !provider.base_url.is_empty() {
-                                    draft.base_url = provider.base_url.to_string();
-                                }
-                                if draft.label.is_empty() {
-                                    draft.label = provider.label.to_string();
-                                }
-                            }
-                        }
-                    });
-                });
-                ui.horizontal(|ui| {
-                    ui.label(language.tr("Label"));
-                    ui.text_edit_singleline(&mut draft.label);
-                });
-                ui.horizontal(|ui| {
-                    ui.label(language.tr("Base URL"));
-                    ui.text_edit_singleline(&mut draft.base_url);
-                });
-                ui.horizontal(|ui| {
-                    ui.label(language.tr("Model"));
-                    if let Some(models) = &app.ai.models {
-                        craft_ui::ComboBox::from_id_salt("ai-model").selected_text(draft.model.clone()).show_ui(ui, |ui| {
-                            for model in models {
-                                if ui.selectable_label(draft.model == *model, model).clicked() {
-                                    draft.model = model.clone();
-                                }
-                            }
-                        });
-                    } else {
-                        ui.text_edit_singleline(&mut draft.model);
-                    }
-                });
-                ui.horizontal(|ui| {
-                    if ui.button(language.tr("Fetch models")).clicked() {
-                        fetch = true;
-                    }
-                    if app.ai.fetching.is_some() {
-                        ui.spinner();
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label(language.tr("API key"));
-                    ui.add(egui::TextEdit::singleline(&mut draft.key).password(true));
-                });
-                ui.horizontal(|ui| {
-                    if ui.button(language.tr("Save connection")).clicked() {
-                        save = true;
-                    }
-                    if ui.button(language.tr("Cancel")).clicked() {
-                        close_draft = true;
-                    }
-                });
-            }
-        });
-    app.ai.panel = open;
-    let app_id = Ai::app();
-    if add {
-        let provider = local_ai::PROVIDERS.iter().find(|provider| provider.id == "openai").or_else(|| local_ai::PROVIDERS.first());
-        let (id, base, label) = provider.map(|provider| (provider.id, provider.base_url, provider.label)).unwrap_or(("custom", "", "Custom"));
-        app.ai.draft = Some(Draft {
-            id: format!("conn-{}", crate::now_ms() as u64),
-            provider: id.to_string(),
-            label: label.to_string(),
-            base_url: base.to_string(),
-            model: String::new(),
-            key: String::new(),
-        });
-        app.ai.models = None;
-    }
-    if let Some(connection) = edit {
-        app.ai.draft = Some(Draft {
-            id: connection.id.clone(),
-            provider: connection.provider.clone(),
-            label: connection.label.clone(),
-            base_url: connection.base_url.clone(),
-            model: connection.model.clone(),
-            key: String::new(),
-        });
-        app.ai.models = None;
-    }
-    if let Some(id) = delete
-        && let Some(connection) = app.ai.connections.iter().find(|connection| connection.id == id).cloned()
-    {
-        let _ = connection.clear_key(&app_id);
-        app.ai.connections.retain(|connection| connection.id != id);
-        let _ = Connection::save_all(&app_id, &app.ai.connections);
-        app.ai.keys.remove(&id);
-        if app.ai.active.as_deref() == Some(id.as_str()) {
-            app.ai.active = app.ai.connections.first().map(|connection| connection.id.clone());
+    // The app's side of the contract: what the panel is, and what goes as context.
+    app.ai.chat.set_system(SYSTEM_PROMPT);
+    app.ai.chat.set_context(chat_context(&app.session));
+    let model = app.ai.model().to_string();
+    let ready = app.ai.ready();
+    let chip_fn = move |info: &ai_ui::ContextInfo| chip(language, info);
+    let labels = ai_ui::ChatLabels {
+        title: language.tr("AI assistant"),
+        not_configured: if ready { "" } else { language.tr("Configure a connection first.") },
+        configure: language.tr("Settings"),
+        settings: language.tr("Settings"),
+        clear: language.tr("Clear"),
+        close: language.tr("Close"),
+        send: language.tr("Send"),
+        stop: language.tr("Stop"),
+        insert: language.tr("Insert into the cell"),
+        retry: language.tr("Retry"),
+        dismiss: language.tr("Dismiss"),
+        empty: language.tr("Ask about the selected table, or about anything."),
+        input_hint: if ready { language.tr("Write to the assistant.") } else { language.tr("Configure a connection first.") },
+        chip: &chip_fn,
+        model: &model,
+        suggestions: &[],
+        to_end: language.tr("To the end"),
+    };
+    egui::Panel::right("ai-chat").resizable(true).default_size(360.0).max_size(560.0).show(ui, |ui| {
+        let strip = app.ai.strip.show(ui, ai_ui::StripLabels { stop: language.tr("Stop"), dismiss: language.tr("Dismiss") });
+        if strip == ai_ui::StripAction::Stop {
+            app.ai.chat_stop();
         }
-    }
-    if let Some(id) = activate {
-        app.ai.active = Some(id);
-    }
-    if fetch && let Some(draft) = &app.ai.draft {
-        let connection = Connection {
-            id: draft.id.clone(),
-            provider: draft.provider.clone(),
-            label: draft.label.clone(),
-            base_url: draft.base_url.clone(),
-            model: draft.model.clone(),
-        };
-        let key = if draft.key.is_empty() { connection.key(&app_id).unwrap_or_default() } else { draft.key.clone() };
-        let (tx, rx) = mpsc::channel();
-        let worker = ctx.clone();
-        std::thread::spawn(move || {
-            let app = Ai::app();
-            let result = local_ai::list_models_with_key(&app, &connection, &key);
-            let _ = tx.send(result);
-            worker.request_repaint();
-        });
-        app.ai.fetching = Some(rx);
-    }
-    if close_draft {
-        app.ai.draft = None;
-        app.ai.models = None;
-    }
-    if save && let Some(draft) = app.ai.draft.take() {
-        let connection = Connection {
-            id: draft.id.clone(),
-            provider: draft.provider.clone(),
-            label: draft.label.clone(),
-            base_url: draft.base_url.clone(),
-            model: draft.model.clone(),
-        };
-        if !draft.key.is_empty()
-            && let Err(error) = connection.set_key(&app_id, &draft.key)
-        {
-            app.ai.error = Some(format!("the key could not be saved: {error}"));
+        ui.separator();
+        match app.ai.chat.show(ui, &labels) {
+            ai_ui::ChatAction::None => {}
+            ai_ui::ChatAction::Send => app.ai.chat_send(&ctx),
+            ai_ui::ChatAction::Retry => {
+                if app.ai.chat.retry() {
+                    app.ai.chat_send(&ctx);
+                }
+            }
+            ai_ui::ChatAction::Stop => app.ai.chat_stop(),
+            ai_ui::ChatAction::Clear => app.ai.chat.clear(),
+            ai_ui::ChatAction::Insert => {
+                app.ai.insert_answer(&mut app.session);
+            }
+            ai_ui::ChatAction::Settings => app.ai.settings_open = true,
+            ai_ui::ChatAction::Close => {
+                app.ai.chat_stop();
+                app.ai.chat_open = false;
+            }
         }
-        if let Some(existing) = app.ai.connections.iter_mut().find(|connection| connection.id == draft.id) {
-            *existing = connection;
-        } else {
-            app.ai.connections.push(connection);
-        }
-        if let Err(error) = Connection::save_all(&app_id, &app.ai.connections) {
-            app.ai.error = Some(format!("the AI connections could not be saved: {error}"));
-        }
-        app.ai.active = app.ai.connections.first().map(|connection| connection.id.clone());
-        app.ai.keys_loaded = false;
-        app.ai.models = None;
+    });
+}
+
+/// The system prompt: the app's vocabulary and what an answer may not claim (model-facing text).
+const SYSTEM_PROMPT: &str = "You are an assistant inside a spreadsheet app. The table around the \
+     user's selection travels as context. Answer in the language of the question, plainly and \
+     briefly. You cannot change the workbook: when the user wants a formula or a filled column, say \
+     what it should be and let them use the app's own AI actions. Never claim you changed a cell.";
+
+/// The selection's table as the panel's context: the region around the active cell, within budget.
+fn chat_context(session: &Session) -> Option<ai_ui::ContextSource> {
+    let context = selection_context(session)?;
+    let doc = session.active()?;
+    let sheet = doc.wb.sheet(doc.wb.active_sheet())?;
+    let mut text = String::new();
+    if !context.header.is_empty() {
+        text.push_str(&context.header);
+        text.push('\n');
+    }
+    text.push_str(&context.text);
+    if text.trim().is_empty() {
+        return None;
+    }
+    let label = format!("{}!{}", sheet.name, context.range.a1());
+    Some(ai_ui::ContextSource::new(ai_ui::ContextKind::Selection, label, text, CONTEXT_LIMIT, ai_ui::Side::Head))
+}
+
+/// The context chip: what the last request really sent.
+fn chip(language: Language, info: &ai_ui::ContextInfo) -> String {
+    let mut text = format!("{} · {} {}", info.label, info.sent, language.tr("characters"));
+    if info.truncated() {
+        text.push_str(&format!(" ({}{})", language.tr("cut from "), info.total));
+    }
+    if info.turns > 0 {
+        text.push_str(&format!(" · {} {}", info.turns, language.tr("turns")));
+    }
+    text
+}
+
+/// The text in the frame's interface language (the app sets it once per pass).
+fn tr<'a>(ctx: &Context, text: &'a str) -> &'a str {
+    crate::i18n::current(ctx).tr(text)
+}
+
+/// Starts one streamed request on a worker thread: the pieces arrive as events on the channel.
+fn spawn_stream(
+    backend: Arc<dyn Backend>,
+    ctx: &Context,
+    connection: Connection,
+    messages: Vec<Msg>,
+) -> Result<(Receiver<Event>, Arc<AtomicBool>), String> {
+    let (tx, rx) = mpsc::channel();
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let worker_cancelled = cancelled.clone();
+    let worker_ctx = ctx.clone();
+    std::thread::Builder::new()
+        .name("localsheets-ai".into())
+        .spawn(move || {
+            let mut on_delta = |delta: &str| {
+                if worker_cancelled.load(Ordering::Relaxed) {
+                    return;
+                }
+                let _ = tx.send(Event::Delta(delta.to_string()));
+                worker_ctx.request_repaint();
+            };
+            let result = backend.stream(&connection, &messages, &mut on_delta);
+            let _ = tx.send(Event::Done(result));
+            worker_ctx.request_repaint();
+        })
+        .map_err(|e| format!("the AI worker could not start: {e}"))?;
+    Ok((rx, cancelled))
+}
+
+/// The provider presets the form offers, from the shared client's table.
+fn presets() -> Vec<ai_ui::Preset> {
+    local_ai::PROVIDERS
+        .iter()
+        .map(|provider| ai_ui::Preset { id: provider.id.to_string(), label: provider.label.to_string(), base_url: provider.base_url.to_string() })
+        .collect()
+}
+
+/// The draft the form shows for the connection in use.
+fn draft_of(connection: &Connection) -> ai_ui::ConnectionDraft {
+    ai_ui::ConnectionDraft { provider: connection.provider.clone(), base_url: connection.base_url.clone(), model: connection.model.clone() }
+}
+
+/// The connection a draft describes (one connection per app, so the id is fixed).
+fn connection_of(draft: &ai_ui::ConnectionDraft) -> Connection {
+    let label = local_ai::provider(&draft.provider).map(|provider| provider.label).unwrap_or(draft.provider.as_str());
+    Connection {
+        id: AI_APP_ID.to_lowercase(),
+        provider: draft.provider.trim().to_string(),
+        label: label.to_string(),
+        base_url: draft.base_url.trim().to_string(),
+        model: draft.model.trim().to_string(),
+    }
+}
+
+/// The connections form's words.
+fn form_labels(language: Language) -> ai_ui::ConnectionsLabels<'static> {
+    ai_ui::ConnectionsLabels {
+        title: language.tr("AI connection"),
+        provider: language.tr("Provider"),
+        base_url: language.tr("Base URL"),
+        model: language.tr("Model"),
+        api_key: language.tr("API key"),
+        list_models: language.tr("Fetch models"),
+        save: language.tr("Save"),
+        cancel: language.tr("Cancel"),
+        hint_url: language.tr("Empty uses the provider's own address."),
+        hint_key: language.tr("The key lives in the OS keychain; the connection file never holds it."),
     }
 }
 
@@ -1220,16 +1336,18 @@ mod tests {
     }
 
     fn ai() -> Ai {
+        let mut chat = ai_ui::ChatPanel::default();
+        chat.set_policy(ai_ui::WindowPolicy { turns: ai_ui::Turns::LastN(8), total_budget_chars: BUDGET_CHARS });
         Ai {
             backend: no_backend(),
-            connections: Vec::new(),
-            active: None,
-            keys: HashMap::new(),
-            keys_loaded: true,
-            panel: false,
+            connection: None,
+            settings_open: false,
+            connections: ai_ui::ConnectionsPanel::default(),
+            chat,
+            strip: ai_ui::StatusStrip::default(),
+            chat_open: false,
+            chat_running: None,
             dialog: None,
-            draft: None,
-            models: None,
             fetching: None,
             running: None,
             error: None,
@@ -1671,5 +1789,179 @@ mod tests {
         let mut session = session();
         assert_eq!(ai().apply(&mut session, &request, Apply::Sheet { preset: Preset::None, currency: "$" }, outcome), Ok(true));
         assert_eq!(value(&mut session, "A2"), json!("Rent"));
+    }
+
+    // ---- the suite's chat surface ------------------------------------------------------------
+
+    /// The policy the panel asks for: the last 8 turns and one budget for everything that leaves.
+    #[test]
+    fn the_chat_keeps_the_last_turns_within_the_budget() {
+        let ai = ai();
+        let policy = ai.chat.policy();
+        assert_eq!(policy.turns, ai_ui::Turns::LastN(8));
+        assert_eq!(policy.total_budget_chars, BUDGET_CHARS);
+    }
+
+    /// The selection's region is what travels: the header row and the values, named by its range.
+    #[test]
+    fn the_selection_table_is_the_chats_context() {
+        let mut session = session();
+        session.execute("range.setValues", json!({ "range": "A1", "values": [["Item", "Cost"], ["Rent", 1200]], "parse": false })).unwrap();
+        let context = chat_context(&session).expect("the selection's table");
+        assert_eq!(context.kind, ai_ui::ContextKind::Selection);
+        assert_eq!(context.side, ai_ui::Side::Head);
+        assert!(context.label.starts_with("Sheet1!A1"), "{}", context.label);
+        assert!(context.text.contains("Item | Cost"), "{}", context.text);
+        assert!(context.text.contains("Rent | 1200"), "{}", context.text);
+        assert!(context.budget_chars <= BUDGET_CHARS);
+    }
+
+    /// An empty area sends nothing: there is no document side for the panel to announce.
+    #[test]
+    fn an_empty_selection_sends_no_context() {
+        let session = session();
+        assert!(chat_context(&session).is_none());
+    }
+
+    /// Insert writes the answer as **text** into the active cell, in one undo step, and an answer
+    /// that looks like a formula stays text (anti-sorcery: the Formula action is the only way in).
+    #[test]
+    fn the_answer_goes_into_the_cell_as_text() {
+        let mut session = session();
+        let mut ai = ai();
+        ai.chat.push_answer("=SUM(A1:A9)");
+        assert!(ai.insert_answer(&mut session), "the answer lands in the cell");
+        assert_eq!(value(&mut session, "A1"), json!("=SUM(A1:A9)"), "an equals stays text");
+        assert!(undo_steps(&session) >= 1);
+        // A plain answer goes in exactly as it came.
+        ai.chat.push_answer("  forty-two  ");
+        assert!(ai.insert_answer(&mut session));
+        assert_eq!(value(&mut session, "A1"), json!("forty-two"), "the answer is trimmed");
+    }
+
+    /// Nothing to insert (no answer yet) writes nothing at all.
+    #[test]
+    fn an_empty_chat_inserts_nothing() {
+        let mut session = session();
+        let mut ai = ai();
+        assert!(!ai.insert_answer(&mut session));
+        assert_eq!(value(&mut session, "A1"), json!(null));
+    }
+
+    /// A question typed in the panel goes through the app's own client and the answer lands in the
+    /// panel: the shared panel owns the conversation, the app owns the transport.
+    #[test]
+    fn a_chat_question_goes_through_the_apps_client() {
+        let ctx = Context::default();
+        let mut session = session();
+        let mut ai = ai();
+        ai.connection = Some(la::Connection {
+            id: "test".into(),
+            provider: "custom".into(),
+            label: "Test".into(),
+            base_url: String::new(),
+            model: "mock".into(),
+        });
+        ai.backend = Arc::new(Canned("quarenta e dois"));
+        assert!(ai.chat.ask("quanto é?"), "the panel took the question");
+        ai.chat_send(&ctx);
+        assert!(ai.chat_running.is_some(), "the worker was started");
+        for _ in 0..400 {
+            ai.tick(&mut session);
+            if ai.chat_running.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(ai.chat_running.is_none(), "the answer finished");
+        assert_eq!(ai.chat.last_answer(), Some("quarenta e dois"));
+        assert!(ai.strip.error().is_none(), "no error in the strip");
+    }
+
+    /// Visual QA (ignored in CI): renders the assistant panel and the connections form in both
+    /// themes to PNGs for the vision pass. Run with
+    /// `cargo test -p localsheets-ui-egui --lib ai::tests::renders_the_ai_surfaces_for_visual_qa -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "visual QA: renders the AI surfaces to PNGs for review"]
+    fn renders_the_ai_surfaces_for_visual_qa() {
+        fn app(dark: bool) -> SheetApp {
+            let mut session = Session::new();
+            session.new_workbook();
+            session
+                .execute("range.setValues", json!({ "range": "A1", "values": [["Item", "Cost"], ["Rent", 1200], ["Food", 300]], "parse": false }))
+                .unwrap();
+            let mut app = SheetApp::new(session, Default::default());
+            app.ui.language = Language::En;
+            // The app applies the saved preference itself: dark is the preference, not the system's.
+            app.ui.dark = dark;
+            app.ui.system_theme = false;
+            app.ai.connection = Some(la::Connection {
+                id: "qa".into(),
+                provider: "custom".into(),
+                label: "Local QA".into(),
+                base_url: String::new(),
+                model: "qa-model".into(),
+            });
+            app
+        }
+        fn draw(ui: &mut Ui, app: &mut SheetApp) {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        }
+        fn save(h: &mut egui_kittest::Harness<'_, SheetApp>, name: &str) {
+            h.run_steps(3);
+            let image = h.render().expect("render");
+            let path = std::env::temp_dir().join(format!("localsheets-{name}.png"));
+            image.save(&path).expect("save");
+            println!("{}", path.display());
+        }
+        for (name, dark) in [("light", false), ("dark", true)] {
+            let mut a = app(dark);
+            a.ai.chat_open = true;
+            a.ai.chat.push_answer("The **Rent** row costs 1200.\n\n- Food: 300\n- Rent: 1200");
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_accessibility_check(false).build_ui_state(draw, a);
+            save(&mut h, &format!("ai-chat-{name}"));
+
+            let mut b = app(dark);
+            b.ai.settings_open = true;
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 800.0)).with_accessibility_check(false).build_ui_state(draw, b);
+            save(&mut h, &format!("ai-connections-{name}"));
+        }
+    }
+
+    /// The real-model chat, end to end: network and a key, so `#[ignore]`. Run with
+    /// `AI_TEST_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free cargo test -p localsheets-ui-egui --lib ai::tests::a_real_model_answers_the_chat -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "network + a real provider key"]
+    fn a_real_model_answers_the_chat() {
+        let key = real_key();
+        let connection = la::Connection {
+            id: "real".into(),
+            provider: "openrouter".into(),
+            label: "OpenRouter".into(),
+            base_url: String::new(),
+            model: std::env::var("AI_TEST_MODEL").unwrap_or_else(|_| "nvidia/nemotron-3-ultra-550b-a55b:free".into()),
+        };
+        let mut session = session();
+        session
+            .execute("range.setValues", json!({ "range": "A1", "values": [["Item", "Cost"], ["Rent", 1200], ["Food", 300]], "parse": false }))
+            .unwrap();
+        let context = chat_context(&session).expect("the table");
+        let messages = vec![
+            Msg::System(SYSTEM_PROMPT.to_string()),
+            Msg::System(format!("{}\n\n{}", context.label, context.text)),
+            Msg::User("Quanto custa o aluguel na tabela?".into()),
+        ];
+        let mut pieces = 0;
+        let answer =
+            la::chat_stream_with_key(&local_ai::App { id: AI_APP_ID, url: AI_APP_URL }, &connection, &key, &messages, &mut |_: &str| pieces += 1)
+                .expect("a real answer");
+        println!("--- answer ({pieces} pieces) ---\n{answer}\n--------------");
+        assert!(
+            answer.to_lowercase().contains("1200") || answer.to_lowercase().contains("1.200") || answer.to_lowercase().contains("1,200"),
+            "{answer}"
+        );
+        assert!(pieces > 1, "the answer streamed in pieces");
     }
 }
