@@ -85,6 +85,10 @@ pub(super) fn automate(app: &mut SheetApp, ui: &mut Ui) {
     if __k.clicked() {
         app.open_dialog("journal", json!({}));
     }
+}
+
+/// The Help tab: updates and the About box.
+pub(super) fn help(app: &mut SheetApp, ui: &mut Ui) {
     let __k = big_button(ui, Icon::Script, "Check for\nUpdates…", "Look for a newer Local Sheets release", false);
     control_keytip(app, ui, &__k, "checkForUpdates");
     if __k.clicked() {

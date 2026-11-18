@@ -368,6 +368,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Αναθεώρηση",
         "View" => "Προβολή",
         "Automate" => "Αυτοματισμός",
+        "Help" => "Βοήθεια",
         "Table Design" => "Σχεδίαση πίνακα",
         "Chart Design" => "Σχεδίαση γραφήματος",
         "Ready" => "Έτοιμο",

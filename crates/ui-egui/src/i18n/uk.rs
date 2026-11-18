@@ -268,6 +268,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Рецензування",
         "View" => "Вигляд",
         "Automate" => "Автоматизація",
+        "Help" => "Довідка",
         "Table Design" => "Конструктор таблиць",
         "Chart Design" => "Конструктор діаграм",
         "Ready" => "Готово",

@@ -282,6 +282,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Xem lại",
         "View" => "Xem",
         "Automate" => "Tự động hóa",
+        "Help" => "Trợ giúp",
         "Table Design" => "Thiết kế bảng",
         "Chart Design" => "Thiết kế biểu đồ",
         "Ready" => "Sẵn sàng",

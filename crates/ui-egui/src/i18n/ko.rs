@@ -275,6 +275,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "검토",
         "View" => "보기",
         "Automate" => "자동화",
+        "Help" => "도움말",
         "Table Design" => "표 디자인",
         "Chart Design" => "차트 디자인",
         "Ready" => "준비",

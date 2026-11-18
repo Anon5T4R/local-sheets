@@ -382,6 +382,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Gözden Geçir",
         "View" => "Görünüm",
         "Automate" => "Otomatikleştir",
+        "Help" => "Yardım",
         "Table Design" => "Tablo Tasarımı",
         "Chart Design" => "Grafik Tasarımı",
         "Ready" => "Hazır",

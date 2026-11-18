@@ -273,6 +273,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Revizuire",
         "View" => "Vizualizare",
         "Automate" => "Automatizare",
+        "Help" => "Ajutor",
         "Table Design" => "Design tabel",
         "Chart Design" => "Proiectare diagramă",
         "Ready" => "Gata",

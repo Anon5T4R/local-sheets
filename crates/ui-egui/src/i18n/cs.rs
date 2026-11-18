@@ -407,6 +407,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Revize",
         "View" => "Zobrazení",
         "Automate" => "Automatizace",
+        "Help" => "Nápověda",
         "Table Design" => "Návrh tabulky",
         "Chart Design" => "Návrh grafu",
         "Ready" => "Připraveno",

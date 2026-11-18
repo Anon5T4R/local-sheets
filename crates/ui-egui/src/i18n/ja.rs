@@ -283,6 +283,7 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Review", "レビュー"),
     ("View", "表示"),
     ("Automate", "自動化"),
+    ("Help", "ヘルプ"),
     ("Table Design", "テーブル デザイン"),
     ("Chart Design", "グラフ デザイン"),
     ("Ready", "準備完了"),

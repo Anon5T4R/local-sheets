@@ -275,6 +275,7 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Review" => "Рецензирование",
         "View" => "Вид",
         "Automate" => "Автоматизация",
+        "Help" => "Справка",
         "Table Design" => "Конструктор таблиц",
         "Chart Design" => "Конструктор диаграмм",
         "Ready" => "Готово",
