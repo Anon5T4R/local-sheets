@@ -7,8 +7,8 @@ use super::state::{NoticeKind, OpenWindow, SaveAnswer, SheetView};
 use super::updates_ui;
 use super::{
     CellRef, HashMap, INTERFACE_SCALE_MAX, INTERFACE_SCALE_MIN, Json, Notice, Perf, RangeRef, Session, SheetApp, UiRequest, UiState, backstage,
-    clamp_interface_scale, clean_error, control, desktop_theme, dialogs, editor, floating_pictures, formula_bar, formula_locale, grid, i18n, json,
-    keytips, macro_ui, panes, pivot_pane, printing, ribbon, tabs, text_box, theme, widgets,
+    clamp_interface_scale, clean_error, control, dialogs, editor, floating_pictures, formula_bar, formula_locale, grid, i18n, json, keytips,
+    macro_ui, panes, pivot_pane, printing, ribbon, tabs, text_box, theme, widgets,
 };
 
 mod clipboard;
@@ -62,8 +62,6 @@ impl SheetApp {
             fonts_rebind: false,
             fonts_han: None,
             effective_dark: false,
-            desktop_theme: desktop_theme::DesktopTheme::default(),
-            desktop_dark: None,
             name_box: None,
             keytips: keytips::KeyTips::default(),
             shots: control::Shots::default(),
@@ -116,9 +114,6 @@ impl SheetApp {
         let open: Vec<u64> = self.session.documents().iter().map(|d| d.uid).collect();
         floating_pictures::forget_closed(ctx, &open);
         self.apply_font_state(ctx);
-        if let Some(answer) = self.desktop_theme.take_change() {
-            self.desktop_dark = Some(answer);
-        }
         self.sync_theme_preference(ctx);
         self.sync_input_options(ctx);
         // The geometry captures are bound to. Native frames recorded it from their fresh

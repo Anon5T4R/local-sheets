@@ -36,6 +36,7 @@ winit = { version = "0.30", default-features = false, features = ["x11", "waylan
 # Cargo.toml).
 craft-print = { path = "../../libs/craft-libs/crates/print/" }
 craft-update = { workspace = true }
+craft-desktop-theme = { workspace = true }
 rfd = { workspace = true }
 arboard = { workspace = true, features = ["image-data"] }
 localsheets-mcp = { workspace = true }

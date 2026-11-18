@@ -1,21 +1,13 @@
+use super::SheetApp;
 #[cfg(not(target_arch = "wasm32"))]
 use super::updates_ui;
-use super::{SheetApp, desktop_theme};
 
 impl SheetApp {
     /// Runs a command and shows its error in a message box (for menu/ribbon clicks).
-    /// Follow the desktop's light/dark choice while the app runs (Linux; the desktop app calls
-    /// this once — tests and embedders don't start the watcher thread).
-    pub fn watch_desktop_theme(&mut self) {
-        self.desktop_theme = desktop_theme::DesktopTheme::start();
-    }
-
     /// Follows the desktop/system theme preference and records the effective theme.
     pub(super) fn sync_theme_preference(&mut self, ctx: &egui::Context) {
-        let preference = match (
-            self.ui.system_theme,
-            ctx.system_theme().or_else(|| self.desktop_dark.map(|d| if d { egui::Theme::Dark } else { egui::Theme::Light })),
-        ) {
+        // On Linux the desktop's answer reaches `system_theme` through `craft_desktop_theme`.
+        let preference = match (self.ui.system_theme, ctx.system_theme()) {
             (true, Some(egui::Theme::Dark)) => egui::ThemePreference::Dark,
             (true, Some(egui::Theme::Light)) => egui::ThemePreference::Light,
             _ => self.ui.theme_preference(),

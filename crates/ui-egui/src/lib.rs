@@ -77,7 +77,6 @@ mod state;
 pub use clock::{monotonic_ms, now_ms};
 pub use services::{Chrome, Inbox, Services};
 pub use state::{NoticeKind, OpenWindow, SaveAnswer, SheetView};
-pub mod desktop_theme;
 
 /// Persisted UI preferences.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -264,10 +263,6 @@ pub struct SheetApp {
     /// only when it changes this (see `theme::HanOrder`).
     fonts_han: Option<theme::HanOrder>,
     effective_dark: bool,
-    /// The desktop's light/dark choice, watched while the app runs (Linux has no winit answer).
-    desktop_theme: desktop_theme::DesktopTheme,
-    /// The last answer [`desktop_theme`] gave, so a frame that asks costs nothing.
-    desktop_dark: Option<bool>,
     pub name_box: Option<String>,
     /// Transient ribbon keyboard navigation; never saved with UI preferences.
     pub keytips: keytips::KeyTips,

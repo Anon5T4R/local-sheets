@@ -29,12 +29,6 @@ image = { workspace = true }
 skrifa = { workspace = true }
 web-time = { workspace = true }
 
-# Linux only, where winit reports no system theme: the desktop portal's light/dark answer (see
-# `desktop_theme.rs`). Already in the tree, with these features, through egui's own
-# accessibility bus; pinned to one version so nothing is built twice.
-[target.'cfg(target_os = "linux")'.dependencies]
-zbus = "=5.19.0"
-
 [dev-dependencies]
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 epaint_default_fonts = { workspace = true }
