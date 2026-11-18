@@ -11,7 +11,7 @@
 //! watcher starts, and nothing is installed.
 //!
 //! Call it once from the app binary, never from tests: kittest runs must not depend on the
-//! machine's desktop theme.
+//! machine's desktop theme. Tests that need a desktop answer use [`install`] with a stand-in.
 
 use std::sync::Mutex;
 
@@ -23,19 +23,24 @@ pub fn follow(ctx: &egui::Context) -> bool {
     let wake = ctx.clone();
     let Some(watcher) = Watcher::start(move || wake.request_repaint()) else { return false };
     let watcher = Mutex::new(watcher);
-    ctx.add_plugin(DesktopTheme::new(move || watcher.lock().ok().and_then(|w| w.current())));
+    install(ctx, move || {
+        watcher.lock().ok().and_then(|w| w.current()).map(|theme| match theme {
+            appearance::Theme::Dark => egui::Theme::Dark,
+            appearance::Theme::Light => egui::Theme::Light,
+        })
+    });
     true
+}
+
+/// Install the plugin over any source of the desktop's answer: [`follow`] passes the portal
+/// watcher, a test passes a stand-in. Installing twice keeps the first.
+pub fn install(ctx: &egui::Context, observed: impl Fn() -> Option<egui::Theme> + Send + Sync + 'static) {
+    ctx.add_plugin(DesktopTheme { observed: Box::new(observed) });
 }
 
 /// The plugin, with the answer behind a closure so tests can stand in for the portal.
 struct DesktopTheme {
-    observed: Box<dyn Fn() -> Option<appearance::Theme> + Send + Sync>,
-}
-
-impl DesktopTheme {
-    fn new(observed: impl Fn() -> Option<appearance::Theme> + Send + Sync + 'static) -> Self {
-        Self { observed: Box::new(observed) }
-    }
+    observed: Box<dyn Fn() -> Option<egui::Theme> + Send + Sync>,
 }
 
 impl egui::Plugin for DesktopTheme {
@@ -47,12 +52,13 @@ impl egui::Plugin for DesktopTheme {
         let observed = (self.observed)();
         // The window integration wins when it knows; the portal only fills the gap.
         if input.system_theme.is_none() {
-            input.system_theme = observed.map(|theme| match theme {
-                appearance::Theme::Dark => egui::Theme::Dark,
-                appearance::Theme::Light => egui::Theme::Light,
-            });
+            input.system_theme = observed;
         }
         // Linux window backends cannot resolve `SystemDefault` for their own decorations.
+        let observed = observed.map(|theme| match theme {
+            egui::Theme::Dark => appearance::Theme::Dark,
+            egui::Theme::Light => appearance::Theme::Light,
+        });
         appearance::sync_native_window_theme(ctx, observed);
     }
 }
@@ -63,16 +69,16 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU8, Ordering};
 
-    /// A stand-in portal: 0 = no answer, 1 = dark, 2 = light.
-    fn portal() -> (Arc<AtomicU8>, DesktopTheme) {
+    /// A stand-in portal installed on `ctx`: 0 = no answer, 1 = dark, 2 = light.
+    fn portal(ctx: &egui::Context) -> Arc<AtomicU8> {
         let answer = Arc::new(AtomicU8::new(0));
         let read = Arc::clone(&answer);
-        let plugin = DesktopTheme::new(move || match read.load(Ordering::Relaxed) {
-            1 => Some(appearance::Theme::Dark),
-            2 => Some(appearance::Theme::Light),
+        install(ctx, move || match read.load(Ordering::Relaxed) {
+            1 => Some(egui::Theme::Dark),
+            2 => Some(egui::Theme::Light),
             _ => None,
         });
-        (answer, plugin)
+        answer
     }
 
     fn frame(ctx: &egui::Context, system_theme: Option<egui::Theme>) -> Option<egui::Theme> {
@@ -84,8 +90,7 @@ mod tests {
     #[test]
     fn the_portal_answer_fills_a_missing_system_theme_and_follows_changes() {
         let ctx = egui::Context::default();
-        let (answer, plugin) = portal();
-        ctx.add_plugin(plugin);
+        let answer = portal(&ctx);
         assert_eq!(frame(&ctx, None), None, "no answer yet: the app keeps its fallback");
         answer.store(1, Ordering::Relaxed);
         assert_eq!(frame(&ctx, None), Some(egui::Theme::Dark));
@@ -96,8 +101,7 @@ mod tests {
     #[test]
     fn the_window_integration_answer_wins_over_the_portal() {
         let ctx = egui::Context::default();
-        let (answer, plugin) = portal();
-        ctx.add_plugin(plugin);
+        let answer = portal(&ctx);
         answer.store(1, Ordering::Relaxed);
         assert_eq!(frame(&ctx, Some(egui::Theme::Light)), Some(egui::Theme::Light));
     }
@@ -105,8 +109,7 @@ mod tests {
     #[test]
     fn system_preference_resolves_through_the_portal() {
         let ctx = egui::Context::default();
-        let (answer, plugin) = portal();
-        ctx.add_plugin(plugin);
+        let answer = portal(&ctx);
         ctx.set_theme(egui::ThemePreference::System);
         ctx.options_mut(|o| o.fallback_theme = egui::Theme::Light);
         answer.store(1, Ordering::Relaxed);
