@@ -119,9 +119,11 @@
 
         <!-- Settings > Default apps: lets the user pick Local Sheets for these types. -->
         <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities" Name="ApplicationName" Value="Local Sheets" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities" Name="ApplicationDescription" Value="Open-source spreadsheet for .xlsx, CSV and TSV files" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities" Name="ApplicationDescription" Value="Open-source spreadsheet for .xlsx, .xlsb, .ods, CSV and TSV files" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".xlsx" Value="LocalSheets.Workbook" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".xlsm" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".xlsb" Value="LocalSheets.Workbook" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".ods" Value="LocalSheets.Workbook" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".csv" Value="LocalSheets.TextData" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Anon5T4R\LocalSheets\Capabilities\FileAssociations" Name=".tsv" Value="LocalSheets.TextData" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\RegisteredApplications" Name="Local Sheets" Value="Software\Anon5T4R\LocalSheets\Capabilities" Type="string" />
