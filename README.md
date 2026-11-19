@@ -81,9 +81,9 @@ speaks Spanish, with Spanish formula names, decimal commas and semicolon argumen
 clipboard exchange and programmatic APIs keep canonical English syntax. See
 [docs/formula-input.md](docs/formula-input.md).
 
-Fonts come from [craft-fonts](https://github.com/storytold/craft-fonts): clone it next to this repo
-(`../craft-fonts`) and local builds pick it up automatically; without it Local Sheets uses your
-system fonts.
+Fonts come from craft-fonts, vendored in `assets/craft-fonts/` (`.cargo/config.toml` points
+`CRAFT_FONTS_DIR` at it, so every build embeds them); override `CRAFT_FONTS_DIR` to build with another
+checkout.
 
 Printing goes through the shared `craft-print` crate from `libs/craft-libs` (the Windows spooler, or
 CUPS `lp` elsewhere); PDF export uses the self-contained writer in

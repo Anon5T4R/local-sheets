@@ -58,10 +58,12 @@ repository.
 
 ## Embedded at build time from craft-fonts (`CRAFT_FONTS_DIR`)
 
-Builds that set `CRAFT_FONTS_DIR` (every official release) embed the fonts listed in
-[craft-fonts](https://github.com/storytold/craft-fonts) `fonts/manifest.txt` (per-file authors,
-sources, SHA-256 and licences in its
-[ATTRIBUTION.md](https://github.com/storytold/craft-fonts/blob/main/ATTRIBUTION.md)), minus the
+The craft-fonts tree is vendored in this repository (`assets/craft-fonts/`, replicated unmodified from
+the `assets/craft-fonts/` of [Anon5T4R/local-libs](https://github.com/Anon5T4R/local-libs), the suite's
+single source; `scripts/check-mirror.sh` checks it), and `.cargo/config.toml` points `CRAFT_FONTS_DIR`
+at it, so every build, test and release embeds the fonts listed in its `fonts/manifest.txt` (per-file
+authors, sources, SHA-256 and licences in its
+[ATTRIBUTION.md](assets/craft-fonts/ATTRIBUTION.md)), minus the
 families barred by the repository asset policy in
 [`crates/ui-egui/src/craft_fonts_policy.rs`](crates/ui-egui/src/craft_fonts_policy.rs). No font file
 is copied into this repository.

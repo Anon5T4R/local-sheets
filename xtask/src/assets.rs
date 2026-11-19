@@ -8,7 +8,9 @@
 //!
 //! The vendored trees under `libs/` (and any top-level `vendor/`) are excluded: they are
 //! third-party forks with their own attribution files, built through path dependencies, and this
-//! repo's ATTRIBUTION.md does not list what they carry.
+//! repo's ATTRIBUTION.md does not list what they carry. So is `assets/craft-fonts/`, the suite's font
+//! set replicated unmodified from the local-libs, which carries its own `ATTRIBUTION.md` (and which
+//! `scripts/check-mirror.sh` keeps byte-identical to its source).
 //!
 //! See the asset rule in AGENTS.md: no vendor artwork, and every asset has an attribution row.
 
@@ -23,7 +25,7 @@ const EXAMPLE_EXT: &[&str] = &["csv", "tsv", "json"];
 /// Every file under these directories is an asset.
 const ASSET_DIRS: &[&str] = &["assets/", "docs/images/"];
 /// Vendored third-party trees: not this repo's assets, not in ATTRIBUTION.md (see the module doc).
-const VENDORED_DIRS: &[&str] = &["libs/", "vendor/"];
+const VENDORED_DIRS: &[&str] = &["libs/", "vendor/", "assets/craft-fonts/"];
 
 fn ext(path: &str) -> String {
     Path::new(path).extension().and_then(std::ffi::OsStr::to_str).map(str::to_ascii_lowercase).unwrap_or_default()
