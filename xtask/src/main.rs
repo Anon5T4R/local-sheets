@@ -22,7 +22,8 @@ const USAGE: &str = "\
 usage: cargo xtask <command>
 
 commands:
-  ci              i18n-report, fmt --check, clippy -D warnings, test, doctest, assets, layers, wasm,
+  fmt             fmt --check for the workspace's own packages (never the vendored trees in libs/)
+  ci              i18n-report, fmt --check, clippy -D warnings, test, doctest, assets, layers, cargo-deny, local-libs mirrors, wasm,
                   parity --check, keytips --check (stops at the first failure; the parity check runs
                   only if docs/parity-checklist.md exists)
   test            workspace tests (cargo nextest when installed, else cargo test), then doctests
@@ -48,6 +49,7 @@ fn main() -> ExitCode {
         Some("assets") => assets::run(&root()),
         Some("i18n-report") => i18n_report::run(&root()),
         Some("layers") => cmd_layers(),
+        Some("fmt") => cmd_fmt(),
         Some("wasm") => cmd_wasm(),
         Some("test") => cmd_test().and_then(|()| cmd_doctest()),
         Some("ci") => cmd_ci(),
@@ -208,22 +210,7 @@ fn cmd_ci() -> Result<(), String> {
     let steps: Vec<Step> = vec![
         // Missing translations never fail the gate; the list goes first so every log shows it.
         ("i18n-report", Box::new(|| i18n_report::run(&root()))),
-        (
-            "fmt",
-            Box::new(|| {
-                let members = workspace_members()?;
-                if members.is_empty() {
-                    return Err("no workspace members in the cargo metadata".into());
-                }
-                let mut c = cargo();
-                c.arg("fmt");
-                for m in &members {
-                    c.args(["-p", m]);
-                }
-                c.args(["--", "--check"]);
-                run(c, &format!("cargo fmt -p {} -- --check", members.join(" -p ")))
-            }),
-        ),
+        ("fmt", Box::new(cmd_fmt)),
         (
             "clippy",
             Box::new(|| {
@@ -236,6 +223,8 @@ fn cmd_ci() -> Result<(), String> {
         ("doctest", Box::new(cmd_doctest)),
         ("assets", Box::new(|| assets::run(&root()))),
         ("layers", Box::new(cmd_layers)),
+        ("deny", Box::new(cmd_deny)),
+        ("mirror", Box::new(cmd_mirror)),
         ("wasm", Box::new(cmd_wasm)),
         (
             "parity",
@@ -268,4 +257,50 @@ fn cmd_ci() -> Result<(), String> {
     }
     println!("\nCI summary: all {} steps passed ({})", done.len(), done.join(", "));
     Ok(())
+}
+
+/// cargo-deny (licenses, bans, sources, advisories) as the CI runs it; skipped with a note when the
+/// tool is not installed (`cargo install cargo-deny --locked`).
+fn cmd_deny() -> Result<(), String> {
+    let mut c = cargo();
+    c.args(["deny", "--version"]);
+    if c.output().is_ok_and(|o| o.status.success()) {
+        let mut c = cargo();
+        c.args(["deny", "--log-level", "error", "check", "bans", "licenses", "sources", "advisories"]);
+        run(c, "cargo deny check")
+    } else {
+        eprintln!("note: cargo-deny not installed (cargo install cargo-deny --locked): skipped, the CI runs it");
+        Ok(())
+    }
+}
+
+/// The crates and assets mirrored from the local-libs against their source (`scripts/check-mirror.sh`);
+/// skipped with a note when bash is unavailable.
+fn cmd_mirror() -> Result<(), String> {
+    let mut c = Command::new("bash");
+    c.current_dir(root()).arg("scripts/check-mirror.sh");
+    match c.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!("scripts/check-mirror.sh: exited with {status}")),
+        Err(e) => {
+            eprintln!("note: bash unavailable ({e}): mirror check skipped, the CI runs it");
+            Ok(())
+        }
+    }
+}
+
+/// `cargo xtask fmt`: `fmt --check` for the workspace's own packages. `cargo fmt --all` would also
+/// reformat the path dependencies under `libs/`, which keep their origin style.
+fn cmd_fmt() -> Result<(), String> {
+    let members = workspace_members()?;
+    if members.is_empty() {
+        return Err("no workspace members in the cargo metadata".into());
+    }
+    let mut c = cargo();
+    c.arg("fmt");
+    for m in &members {
+        c.args(["-p", m]);
+    }
+    c.args(["--", "--check"]);
+    run(c, &format!("cargo fmt -p {} -- --check", members.join(" -p ")))
 }
