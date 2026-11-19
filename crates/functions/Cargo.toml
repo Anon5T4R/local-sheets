@@ -3,6 +3,7 @@ name = "localsheets-functions"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 description = "Local Sheets worksheet function library: math, statistics, text, dates, lookup, financial, engineering"
 
 [lints]

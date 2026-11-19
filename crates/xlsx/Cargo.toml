@@ -3,6 +3,7 @@ name = "localsheets-xlsx"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 description = "Local Sheets file formats: XLSX (SpreadsheetML) and CSV import/export"
 
 [lints]

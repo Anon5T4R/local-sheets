@@ -3,7 +3,7 @@ name = "xtask"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+publish.workspace = true
 description = "Local Sheets workspace tooling: cargo xtask ci | layers | assets | wasm | parity | i18n-report | version | stats | ico"
 
 [lints]

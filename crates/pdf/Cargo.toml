@@ -3,6 +3,7 @@ name = "localsheets-pdf"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 description = "Local Sheets's tiny self-contained PDF 1.7 writer (standard 14 fonts, vector drawing, RGBA images)"
 readme = "README.md"
 

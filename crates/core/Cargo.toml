@@ -3,6 +3,7 @@ name = "localsheets-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 description = "Local Sheets core types: cell addresses, values, errors, date serials"
 
 [lints]

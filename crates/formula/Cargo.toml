@@ -3,6 +3,7 @@ name = "localsheets-formula"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 description = "Local Sheets formula language: lexer, parser, printer and reference adjustment"
 
 [lints]
