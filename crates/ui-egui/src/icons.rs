@@ -344,8 +344,27 @@ fn paint_suite(p: &Painter, r: Rect, icon: craft_icons::Icon, c: Color32) -> boo
     }
 }
 
-/// Draws `icon` into `rect` (square-ish), in colour `c`, with palette `pal`.
+/// Draws the suite's SVG for `icon` when the palette asks for it and the icon has one; false otherwise.
+fn paint_suite_icon(p: &Painter, r: Rect, icon: Icon, c: Color32, pal: &Palette) -> bool {
+    pal.suite && suite_icon(icon).is_some_and(|suite| paint_suite(p, r, suite, c))
+}
+
+/// Draws `icon` into `rect` (square-ish), in colour `c`, with palette `pal`: the suite's SVG when it has one,
+/// otherwise the artwork below.
 fn paint_with(p: &Painter, rect: Rect, icon: Icon, c: Color32, pal: &Palette) {
+    let side = rect.width().min(rect.height());
+    let r = Rect::from_center_size(rect.center(), vec2(side, side));
+    let tint = match pal.accent {
+        Some(a) if !has_accent_part(icon) => a,
+        _ => c,
+    };
+    if !paint_suite_icon(p, r, icon, tint, pal) {
+        paint_artwork(p, rect, icon, c, pal);
+    }
+}
+
+/// The icon as Local Sheets draws it, in code.
+fn paint_artwork(p: &Painter, rect: Rect, icon: Icon, c: Color32, pal: &Palette) {
     let side = rect.width().min(rect.height());
     let r = Rect::from_center_size(rect.center(), vec2(side, side));
     let g = G { p, r, s: side / 16.0 };
@@ -353,12 +372,6 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, c: Color32, pal: &Palette) {
         Some(a) if !has_accent_part(icon) => a,
         _ => c,
     };
-    if pal.suite
-        && let Some(suite) = suite_icon(icon)
-        && paint_suite(p, r, suite, c)
-    {
-        return;
-    }
     let light = c.gamma_multiply(0.45);
     let paper = pal.paper;
     let blue = pal.cat(Cat::Blue);
