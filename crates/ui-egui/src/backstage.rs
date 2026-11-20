@@ -174,46 +174,51 @@ pub fn show(app: &mut SheetApp, ui: &mut Ui) {
         .resizable(false)
         .frame(egui::Frame::NONE.fill(nav_bg).inner_margin(egui::Margin { left: 0, right: 0, top: 10, bottom: 10 }))
         .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 0.0;
-            if nav_item(ui, Icon::Back, lang.tr("Back"), false, nav_text, nav_sel).clicked() {
-                out.close = true;
-            }
-            ui.add_space(10.0);
-            for page in [Page::Home, Page::New, Page::Open] {
-                if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
-                    out.page = Some(page);
-                }
-            }
-            nav_separator(ui, nav_text);
-            if nav_item(ui, Page::Info.icon(), lang.tr("Info"), bs.page == Page::Info, nav_text, nav_sel).clicked() {
-                out.page = Some(Page::Info);
-            }
-            if nav_item(ui, Icon::Save, lang.tr("Save"), false, nav_text, nav_sel).clicked() {
-                save(app, &mut out);
-            }
-            for page in [Page::SaveAs, Page::Print, Page::Export] {
-                if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
-                    out.page = Some(page);
-                }
-            }
-            if nav_item(ui, Icon::Close, lang.tr("Close"), false, nav_text, nav_sel).clicked() {
-                // A cell still being edited is part of the workbook; Close keeps the unsaved prompt.
-                if app.commit_edit(0, 0, false, false) {
-                    app.run_or_alert("file.close", json!({}));
+            let panel_h = ui.max_rect().height();
+            // The list scrolls when the window is too short for all of it (Exit stays reachable).
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                if nav_item(ui, Icon::Back, lang.tr("Back"), false, nav_text, nav_sel).clicked() {
                     out.close = true;
                 }
-            }
-            // Bottom up: Account sits just above Options, as in Excel, and Exit closes the list.
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                ui.add_space(10.0);
+                for page in [Page::Home, Page::New, Page::Open] {
+                    if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
+                        out.page = Some(page);
+                    }
+                }
+                nav_separator(ui, nav_text);
+                if nav_item(ui, Page::Info.icon(), lang.tr("Info"), bs.page == Page::Info, nav_text, nav_sel).clicked() {
+                    out.page = Some(Page::Info);
+                }
+                if nav_item(ui, Icon::Save, lang.tr("Save"), false, nav_text, nav_sel).clicked() {
+                    save(app, &mut out);
+                }
+                for page in [Page::SaveAs, Page::Print, Page::Export] {
+                    if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
+                        out.page = Some(page);
+                    }
+                }
+                if nav_item(ui, Icon::Close, lang.tr("Close"), false, nav_text, nav_sel).clicked() {
+                    // A cell still being edited is part of the workbook; Close keeps the unsaved prompt.
+                    if app.commit_edit(0, 0, false, false) {
+                        app.run_or_alert("file.close", json!({}));
+                        out.close = true;
+                    }
+                }
+                // Account, Settings and Exit close the list, at the bottom when there is room (Account just above
+                // Settings, as in Excel); in a short window they follow the other entries.
+                let bottom = 3.0 * 38.0;
+                ui.add_space((panel_h - ui.min_rect().height() - bottom).max(0.0));
+                for page in [Page::Account, Page::Options] {
+                    if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
+                        out.page = Some(page);
+                    }
+                }
                 // Exit quits the app, asking about unsaved workbooks first (the window's close button does the same).
                 if nav_item(ui, Icon::Close, lang.tr("Exit"), false, nav_text, nav_sel).clicked() {
                     let ctx = ui.ctx().clone();
                     app.request_quit(&ctx);
-                }
-                for page in [Page::Options, Page::Account] {
-                    if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
-                        out.page = Some(page);
-                    }
                 }
             });
         });
