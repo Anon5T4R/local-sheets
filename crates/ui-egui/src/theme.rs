@@ -305,6 +305,8 @@ pub fn contrast(a: Color32, b: Color32) -> f32 {
 
 /// Installs light and dark token visuals in both theme slots, keeps the 2-3 px widget and 8-10 px window/menu corner radii from 0.36, and sets spacing, text styles and the active theme.
 pub fn apply(ctx: &egui::Context, dark: bool) {
+    // The SVG loader for the suite's icons (`craft-icons`); installing again is a no-op.
+    egui_extras::install_image_loaders(ctx);
     // Install both palettes before System can switch between the style slots.
     for theme in [egui::Theme::Light, egui::Theme::Dark] {
         let dark = theme == egui::Theme::Dark;

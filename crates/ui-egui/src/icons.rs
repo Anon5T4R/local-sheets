@@ -180,6 +180,8 @@ pub enum Icon {
     RunTo,
     /// Stop: a square.
     StopSquare,
+    /// Help › Check for Updates…: the suite's icon, with a circular arrow as the fallback artwork.
+    CheckForUpdates,
 }
 
 struct G<'a> {
@@ -247,11 +249,13 @@ struct Palette {
     /// The accent colour: the coloured part of an icon that has one (a book's spine and glyph),
     /// otherwise the icon's main colour. `None` draws the icon as it is.
     accent: Option<Color32>,
+    /// UI icons use the suite's SVGs; icons placed on the sheet keep the drawn artwork.
+    suite: bool,
 }
 
 impl Palette {
     fn of(t: &Tokens) -> Palette {
-        Palette { paper: t.paper, cat: t.cat, recording: t.recording, accent: None }
+        Palette { paper: t.paper, cat: t.cat, recording: t.recording, accent: None, suite: true }
     }
 
     fn cat(&self, c: Cat) -> Color32 {
@@ -294,7 +298,50 @@ pub fn paint_accent(p: &Painter, rect: Rect, icon: Icon, c: Color32, accent: Opt
 
 /// Draws `icon` on the sheet, which stays white in both themes, so with the light palette.
 pub fn paint_on_sheet(p: &Painter, rect: Rect, icon: Icon, c: Color32) {
-    paint_with(p, rect, icon, c, &Palette::of(&Tokens::light()));
+    paint_with(p, rect, icon, c, &Palette { suite: false, ..Palette::of(&Tokens::light()) });
+}
+
+/// The suite's icon (`craft-icons`) for a concept every app of the suite shares; the rest of the
+/// icons stay the Sheets artwork drawn below, which also stands in until a suite SVG is ready.
+fn suite_icon(icon: Icon) -> Option<craft_icons::Icon> {
+    use craft_icons::Icon as S;
+    Some(match icon {
+        Icon::NewFile => S::New,
+        Icon::OpenFolder => S::Open,
+        Icon::Save => S::Save,
+        Icon::Print => S::Print,
+        Icon::Share => S::Share,
+        Icon::Undo => S::Undo,
+        Icon::Redo => S::Redo,
+        Icon::Paste => S::Paste,
+        Icon::Cut => S::Cut,
+        Icon::Copy => S::Copy,
+        Icon::Zoom => S::ZoomIn,
+        Icon::Find | Icon::Search => S::Search,
+        Icon::Close => S::Close,
+        Icon::More => S::More,
+        Icon::Plus => S::Add,
+        Icon::Check => S::Check,
+        Icon::Info => S::Info,
+        Icon::Settings => S::Settings,
+        Icon::Appearance => S::ThemeSystem,
+        Icon::CheckForUpdates => S::CheckForUpdates,
+        _ => return None,
+    })
+}
+
+/// Paints a suite icon tinted `c`; false while its SVG is not ready (the caller draws the old artwork).
+fn paint_suite(p: &Painter, r: Rect, icon: craft_icons::Icon, c: Color32) -> bool {
+    let side = r.width().min(r.height());
+    let image = egui::Image::new(craft_icons::ui::source(icon));
+    match image.load_for_size(p.ctx(), vec2(side, side)) {
+        Ok(egui::load::TexturePoll::Ready { texture }) => {
+            let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+            p.image(texture.id, Rect::from_center_size(r.center(), vec2(side, side)), uv, c);
+            true
+        }
+        _ => false,
+    }
 }
 
 /// Draws `icon` into `rect` (square-ish), in colour `c`, with palette `pal`.
@@ -306,6 +353,12 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, c: Color32, pal: &Palette) {
         Some(a) if !has_accent_part(icon) => a,
         _ => c,
     };
+    if pal.suite
+        && let Some(suite) = suite_icon(icon)
+        && paint_suite(p, r, suite, c)
+    {
+        return;
+    }
     let light = c.gamma_multiply(0.45);
     let paper = pal.paper;
     let blue = pal.cat(Cat::Blue);
@@ -888,6 +941,22 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, c: Color32, pal: &Palette) {
             g.line(&[(13.0, 3.0), (13.0, 9.0)], c, 1.1);
         }
         Icon::StopSquare => g.rect(3.0, 3.0, 10.0, 10.0, Some(pal.recording), None),
+        Icon::CheckForUpdates => {
+            g.p.add(CubicBezierShape::from_points_stroke(
+                [g.pt(13.0, 6.0), g.pt(11.5, 2.5), g.pt(5.0, 2.5), g.pt(3.5, 7.0)],
+                false,
+                Color32::TRANSPARENT,
+                Stroke::new(1.2, c),
+            ));
+            g.p.add(CubicBezierShape::from_points_stroke(
+                [g.pt(3.0, 10.0), g.pt(4.5, 13.5), g.pt(11.0, 13.5), g.pt(12.5, 9.0)],
+                false,
+                Color32::TRANSPARENT,
+                Stroke::new(1.2, c),
+            ));
+            g.poly(&[(10.5, 6.0), (14.0, 6.5), (13.0, 3.0)], c);
+            g.poly(&[(5.5, 10.0), (2.0, 9.5), (3.0, 13.0)], c);
+        }
     }
 }
 
