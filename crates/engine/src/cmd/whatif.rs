@@ -35,7 +35,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Goal Seek…",
             ["Data", "Forecast", "What-If Analysis"],
             None,
-            "{set: \"B5\" (formula cell), to: number, changing: \"B2\" (constant cell)} → {value, result, iterations, converged}. Secant search with bisection once the answer is bracketed; stops within Maximum Change (0.001) or after Maximum Iterations (100) from File › Options › Formulas. Writes the found value into `changing`.",
+            "{set: \"B5\" (formula cell), to: number, changing: \"B2\" (constant cell)} → {value, result, iterations, converged}. Secant search with bisection once the answer is bracketed; stops within Maximum Change (0.001) or after Maximum Iterations (100) from File › Settings › Formulas. Writes the found value into `changing`.",
             has_doc,
             goal_seek
         ),

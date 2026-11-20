@@ -1,6 +1,6 @@
 use super::{Key, Language, Modifiers, SheetApp, Ui, dim, i18n, json, section, vec2};
 
-/// Excel's File › Options page: General (display theme, interface language and Show formula bar),
+/// File › Settings (Excel's Options): General (display theme, interface language and Show formula bar),
 /// Editing (AutoComplete) and Save (the autosave checkbox toggling `app.ui.autosave`), plus Formulas
 /// (calculation mode and iterative calculation) and the display options for this workbook (sheet
 /// tabs and scroll bars) when a document is active. Theme, language, formula
@@ -59,7 +59,7 @@ fn general_options(app: &mut SheetApp, ui: &mut Ui, lang: Language) {
         let label = ui.label(lang.tr("Display theme"));
         let mode = app.ui.theme_mode();
         let current = match mode {
-            "system" => "System",
+            "system" => "Automatic",
             "dark" => "Dark",
             _ => "Light",
         };
@@ -67,7 +67,7 @@ fn general_options(app: &mut SheetApp, ui: &mut Ui, lang: Language) {
             .width(160.0)
             .selected_text(lang.tr(current))
             .show_ui(ui, |ui| {
-                for (value, label) in [("system", "System"), ("light", "Light"), ("dark", "Dark")] {
+                for (value, label) in [("system", "Automatic"), ("light", "Light"), ("dark", "Dark")] {
                     if ui.selectable_label(mode == value, lang.tr(label)).clicked() {
                         app.run_or_alert("view.theme", json!({"mode": value}));
                     }

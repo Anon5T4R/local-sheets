@@ -1157,6 +1157,10 @@ fn form_labels(language: Language) -> ai_ui::ConnectionsLabels<'static> {
         cancel: language.tr("Cancel"),
         hint_url: language.tr("Empty uses the provider's own address."),
         hint_key: language.tr("The key lives in the OS keychain; the connection file never holds it."),
+        close: language.tr("Close"),
+        needs_key: language.tr("Paste the API key first: this provider asks for one."),
+        needs_url: language.tr("Choose a provider or type its address first."),
+        needs_model: language.tr("Choose a model first (Fetch models lists them)."),
     }
 }
 

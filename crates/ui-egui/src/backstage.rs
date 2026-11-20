@@ -78,7 +78,7 @@ impl Page {
             Page::SaveAs => "Save As",
             Page::Print => "Print",
             Page::Export => "Export",
-            Page::Options => "Options",
+            Page::Options => "Settings",
             Page::Account => "Account",
         }
     }
@@ -203,8 +203,13 @@ pub fn show(app: &mut SheetApp, ui: &mut Ui) {
                     out.close = true;
                 }
             }
-            // Bottom up: Account sits just above Options, as in Excel.
+            // Bottom up: Account sits just above Options, as in Excel, and Exit closes the list.
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                // Exit quits the app, asking about unsaved workbooks first (the window's close button does the same).
+                if nav_item(ui, Icon::Close, lang.tr("Exit"), false, nav_text, nav_sel).clicked() {
+                    let ctx = ui.ctx().clone();
+                    app.request_quit(&ctx);
+                }
                 for page in [Page::Options, Page::Account] {
                     if nav_item(ui, page.icon(), lang.tr(page.label()), bs.page == page, nav_text, nav_sel).clicked() {
                         out.page = Some(page);

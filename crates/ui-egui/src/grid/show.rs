@@ -213,7 +213,7 @@ pub fn show(app: &mut SheetApp, ui: &mut egui::Ui) {
     update_clipboard_repaint(app, ui, now);
 }
 
-/// The vertical scroll bar's width: none when the workbook hides it (File › Options ›
+/// The vertical scroll bar's width: none when the workbook hides it (File › Settings ›
 /// Display options for this workbook), and the grid takes its room.
 fn vertical_bar_width(app: &SheetApp, available: Rect) -> f32 {
     if app.session.active().is_none_or(|d| d.wb.view.show_vertical_scroll) { 14.0_f32.min(available.width()) } else { 0.0 }

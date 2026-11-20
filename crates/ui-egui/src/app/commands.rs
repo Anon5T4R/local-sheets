@@ -395,7 +395,7 @@ impl SheetApp {
                     dl(&name, &b);
                 }
             }
-            // File › Options (`file.options`) and the File tab itself open the Backstage view.
+            // File › Settings (`file.options`) and the File tab itself open the Backstage view.
             "options" => self.open_backstage(backstage::Page::Options),
             "backstage" => {
                 let page = params.get("page").and_then(Json::as_str).and_then(backstage::Page::parse).unwrap_or(backstage::Page::Home);

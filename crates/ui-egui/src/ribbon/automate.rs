@@ -70,7 +70,7 @@ pub(super) fn automate(app: &mut SheetApp, ui: &mut Ui) {
         }
     });
     sep(ui);
-    let __k = big_button(ui, Icon::Script, "Command\nPalette", "Search and run any command", false);
+    let __k = big_button(ui, Icon::Search, "Command\nPalette", "Search and run any command", false);
     control_keytip(app, ui, &__k, "commandSearch");
     if __k.clicked() {
         app.open_dialog("commandSearch", json!({}));
@@ -89,12 +89,12 @@ pub(super) fn automate(app: &mut SheetApp, ui: &mut Ui) {
 
 /// The Help tab: updates and the About box.
 pub(super) fn help(app: &mut SheetApp, ui: &mut Ui) {
-    let __k = big_button(ui, Icon::Script, "Check for\nUpdates…", "Look for a newer Local Sheets release", false);
+    let __k = big_button(ui, Icon::CheckForUpdates, "Check for\nUpdates…", "Look for a newer Local Sheets release", false);
     control_keytip(app, ui, &__k, "checkForUpdates");
     if __k.clicked() {
         app.run_or_alert("app.checkForUpdates", json!({}));
     }
-    let __k = big_button(ui, Icon::Script, "About\nLocal Sheets", "Version, contributors and the AI models that helped", false);
+    let __k = big_button(ui, Icon::Info, "About\nLocal Sheets", "Version, contributors and the AI models that helped", false);
     control_keytip(app, ui, &__k, "about");
     if __k.clicked() {
         app.open_dialog("about", json!({}));

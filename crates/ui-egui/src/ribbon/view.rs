@@ -103,7 +103,7 @@ pub(super) fn view(app: &mut SheetApp, ui: &mut Ui) {
         let label_response = ui.label(lang.tr("Display theme"));
         let mode = app.ui.theme_mode();
         let label = match mode {
-            "system" => "System",
+            "system" => "Automatic",
             "dark" => "Dark",
             _ => "Light",
         };
@@ -111,7 +111,7 @@ pub(super) fn view(app: &mut SheetApp, ui: &mut Ui) {
             .selected_text(lang.tr(label))
             .width(88.0)
             .show_ui(ui, |ui| {
-                for (value, label) in [("system", "System"), ("light", "Light"), ("dark", "Dark")] {
+                for (value, label) in [("system", "Automatic"), ("light", "Light"), ("dark", "Dark")] {
                     if ui.selectable_label(mode == value, lang.tr(label)).clicked() {
                         act(app, "view.theme", json!({"mode": value}));
                     }
@@ -138,23 +138,6 @@ pub(super) fn view(app: &mut SheetApp, ui: &mut Ui) {
                 for v in [100, 75, 90, 110, 125, 150, 175, 200] {
                     if ui.selectable_label(v == current, text(v)).clicked() {
                         act(app, "view.interfaceScale", json!({"percent": v}));
-                    }
-                }
-            })
-            .response
-            .labelled_by(label.id);
-    });
-    // Interface language: settings live in the View tab, like Excel's Options. The label follows
-    // the current language so it stays readable; the choices are always shown in their own script.
-    ui.vertical(|ui| {
-        let label = ui.label(egui::RichText::new(lang.tr("Interface language")).font(theme::ui_font(11.5)).color(t.text_dim));
-        craft_ui::ComboBox::from_id_salt("ui_language")
-            .width(120.0)
-            .selected_text(egui::RichText::new(lang.name()).font(theme::ui_font(12.5)))
-            .show_ui(ui, |ui| {
-                for l in crate::i18n::Language::ALL {
-                    if ui.selectable_label(l == lang, l.name()).clicked() {
-                        act(app, "app.language.set", json!({"language": l.code()}));
                     }
                 }
             })

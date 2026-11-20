@@ -45,7 +45,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Show Sheet Tabs",
             [],
             None,
-            "{on?} (File › Options › Advanced, this workbook; toggles without `on`)",
+            "{on?} (File › Settings › Advanced, this workbook; toggles without `on`)",
             has_doc,
             |s, p| { workbook_view_flag(s, p, "sheetTabs") }
         ),
@@ -210,7 +210,7 @@ fn sheet_flag(s: &mut Session, p: &Json, which: &str) -> Result<Json> {
     })
 }
 
-/// File › Options › Advanced › Display options for this workbook: the sheet tabs and the two
+/// File › Settings › Advanced › Display options for this workbook: the sheet tabs and the two
 /// scroll bars, saved with the workbook (`<workbookView showSheetTabs … />`).
 fn workbook_view_flag(s: &mut Session, p: &Json, which: &str) -> Result<Json> {
     edit(s, |cx| {

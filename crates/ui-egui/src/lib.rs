@@ -186,6 +186,17 @@ impl UiState {
         clamp_interface_scale(self.interface_scale as f64).unwrap_or(100) as f32 / 100.0
     }
 
+    /// The suite's theme mode (`craft-icons`) for this preference: the title bar's theme button shows and cycles it.
+    pub fn suite_mode(&self) -> craft_icons::ThemeMode {
+        if self.system_theme {
+            craft_icons::ThemeMode::System
+        } else if self.dark {
+            craft_icons::ThemeMode::Dark
+        } else {
+            craft_icons::ThemeMode::Light
+        }
+    }
+
     pub fn theme_mode(&self) -> &'static str {
         if self.system_theme {
             "system"

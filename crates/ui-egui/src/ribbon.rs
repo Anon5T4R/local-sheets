@@ -29,7 +29,7 @@ use ai::ai;
 use automate::{automate, help};
 use contextual::{chart_design, table_design};
 pub(crate) use controls::{ComboResult, editable_combo};
-use controls::{act, keytip};
+use controls::keytip;
 use data::data;
 use formulas::formulas;
 pub use home::FONTS;
@@ -261,18 +261,6 @@ fn file_menu(app: &mut SheetApp, ui: &mut Ui) {
         && let Some(sequence) = keytip_table::tab_sequence("File")
     {
         keytip(app, ui, sequence, pos2(file.rect.center().x, file.rect.bottom() - 1.0));
-    }
-}
-
-/// System / Light / Dark, as in the View tab's Display theme box (`view.theme`).
-fn theme_choices(app: &mut SheetApp, ui: &mut Ui) {
-    let lang = app.ui.language;
-    let mode = app.ui.theme_mode();
-    for (value, label) in [("system", "System"), ("light", "Light"), ("dark", "Dark")] {
-        if ui.radio(mode == value, lang.tr(label)).clicked() {
-            act(app, "view.theme", json!({"mode": value}));
-            ui.close();
-        }
     }
 }
 

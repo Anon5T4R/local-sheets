@@ -1,5 +1,5 @@
 use super::controls::{act, control_keytip};
-use super::{Color32, Icon, Sense, SheetApp, Stroke, StrokeKind, Tokens, Ui, icon_button, json, pos2, small_button, theme, theme_choices, vec2};
+use super::{Color32, Icon, Sense, SheetApp, Stroke, StrokeKind, Tokens, Ui, icon_button, json, pos2, small_button, theme, vec2};
 
 /// macOS draws the window into the title bar (`with_fullsize_content_view`) and AppKit paints the
 /// traffic lights itself, centred in its standard 28 pt title-bar band. Moving them would take
@@ -121,11 +121,8 @@ pub fn title_bar(app: &mut SheetApp, ui: &mut Ui) {
             let left_end = ui.min_rect().right();
             let right = ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(8.0);
-                let __k = icon_button(ui, Icon::Search, t.text_dim, "Search commands", vec2(28.0, ch));
-                control_keytip(app, ui, &__k, "commandSearch");
-                if __k.clicked() {
-                    app.open_dialog("commandSearch", json!({}));
-                }
+                // The suite's controls, right to left: Settings (the gear), the theme, the command search.
+                shell_buttons(app, ui);
                 let share = small_button(ui, Icon::Share, "Share", "Share: export or save a copy", true);
                 egui::Popup::menu(&share).show(|ui| {
                     if ui.button("Export as PDF…").clicked() {
@@ -144,16 +141,6 @@ pub fn title_bar(app: &mut SheetApp, ui: &mut Ui) {
                 if __k.clicked() {
                     app.open_dialog("comments", json!({}));
                 }
-                // Quick light/dark switch (#194); right-click offers System as well. The same
-                // choice lives in File › Display theme and the View tab.
-                let lang = app.ui.language;
-                let theme = icon_button(ui, Icon::Appearance, t.text_dim, "Dark Mode", vec2(28.0, 26.0));
-                let dark = ui.ctx().theme() == egui::Theme::Dark;
-                theme.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, dark, lang.tr("Dark Mode")));
-                if theme.clicked() {
-                    act(app, "view.darkMode", json!({}));
-                }
-                theme.context_menu(|ui| theme_choices(app, ui));
                 ui.min_rect().left()
             });
             // Centred title, cut with "…" so it never runs under the controls on either side.
@@ -163,6 +150,28 @@ pub fn title_bar(app: &mut SheetApp, ui: &mut Ui) {
             paint_title(ui, rect.center(), &title, dirty, max_w, t.text);
         });
     });
+}
+
+/// The suite's controls of the title bar, in a right-to-left layout: the gear that opens Settings
+/// (File › Settings), the theme button (Automatic, Light, Dark) and the magnifier that opens the
+/// command search. Ctrl+K stays Insert Link, so the search has no shortcut.
+fn shell_buttons(app: &mut SheetApp, ui: &mut Ui) {
+    let lang = app.ui.language;
+    if craft_icons::ui::button(ui, craft_icons::Icon::Settings, lang.tr("Settings")).clicked() {
+        app.open_backstage(crate::backstage::Page::Options);
+    }
+    ui.add_space(6.0);
+    let mut mode = app.ui.suite_mode();
+    let tooltip = format!("{}: {}", lang.tr("Theme"), lang.tr(mode.label()));
+    if craft_icons::ui::theme_button(ui, &mut mode, &tooltip) {
+        act(app, "view.theme", json!({"mode": mode.id()}));
+    }
+    ui.add_space(6.0);
+    let search = craft_icons::ui::button(ui, craft_icons::Icon::Search, lang.tr("Search commands"));
+    control_keytip(app, ui, &search, "commandSearch");
+    if search.clicked() {
+        app.open_dialog("commandSearch", json!({}));
+    }
 }
 
 /// Lay out the title truncated to fit `max_w` together with the unsaved marker (when `dirty`).

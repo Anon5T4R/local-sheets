@@ -103,7 +103,7 @@ pub fn sheet_tabs(app: &mut SheetApp, ui: &mut Ui) {
     // Only the controls drawn this frame have a rectangle: a hidden one keeps no stale geometry.
     app.grid.hscroll = None;
     app.grid.tab_split = None;
-    // File › Options › Advanced › Display options for this workbook (#3101): with neither the
+    // File › Settings › Advanced › Display options for this workbook (#3101): with neither the
     // sheet tabs nor the horizontal scroll bar, the bar isn't there at all.
     let view = app.session.active().map(|d| d.wb.view).unwrap_or_default();
     if !view.show_sheet_tabs && !view.show_horizontal_scroll {
