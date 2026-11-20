@@ -468,6 +468,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Afficher",
         "Collapse dialog" => "Réduire la boîte de dialogue",
         "Expand dialog" => "Développer la boîte de dialogue",
+        "Settings" => "Paramètres",
+        "Exit" => "Quitter",
+        "Search commands" => "Rechercher des commandes",
+        "Paste the API key first: this provider asks for one." => "Collez d'abord la clé d'API : ce fournisseur en demande une.",
+        "Choose a provider or type its address first." => "Choisissez d'abord un fournisseur ou saisissez son adresse.",
+        "Choose a model first (Fetch models lists them)." => "Choisissez d'abord un modèle (Récupérer les modèles les liste).",
+        "Check for\nUpdates…" => "Rechercher des\nmises à jour…",
+        "Look for a newer Local Sheets release" => "Rechercher une version plus récente de Local Sheets",
+        "Type a command, e.g. freeze, chart, bold…" => "Saisissez une commande, p. ex. figer, graphique, gras…",
         _ => return None,
     })
 }

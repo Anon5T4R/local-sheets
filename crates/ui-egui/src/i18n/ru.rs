@@ -476,6 +476,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Показать",
         "Collapse dialog" => "Свернуть диалоговое окно",
         "Expand dialog" => "Развернуть диалоговое окно",
+        "Settings" => "Параметры",
+        "Exit" => "Выход",
+        "Search commands" => "Поиск команд",
+        "Paste the API key first: this provider asks for one." => "Сначала вставьте ключ API: этот провайдер его требует.",
+        "Choose a provider or type its address first." => "Сначала выберите провайдера или введите его адрес.",
+        "Choose a model first (Fetch models lists them)." => "Сначала выберите модель (список покажет «Получить модели»).",
+        "Check for\nUpdates…" => "Проверить\nобновления…",
+        "Look for a newer Local Sheets release" => "Проверить наличие новой версии Local Sheets",
+        "Type a command, e.g. freeze, chart, bold…" => "Введите команду, например закрепить, диаграмма, жирный…",
         _ => return None,
     })
 }

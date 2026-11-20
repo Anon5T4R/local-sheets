@@ -1067,6 +1067,12 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Empty uses the provider's own address." => "Vazio usa o endereço do próprio provedor.",
         "No AI connection yet. Open AI > Connections and add one." => "Ainda não há conexão de IA. Abra IA > Conexões e adicione uma.",
         "Another AI request is still running. Stop it or wait for it." => "Outra requisição de IA ainda está em andamento. Pare-a ou espere.",
+        "Exit" => "Sair",
+        "Paste the API key first: this provider asks for one." => "Cole a chave de API primeiro: este provedor exige uma.",
+        "Choose a provider or type its address first." => "Escolha um provedor ou digite o endereço dele primeiro.",
+        "Choose a model first (Fetch models lists them)." => "Escolha um modelo primeiro (Buscar modelos mostra a lista).",
+        "Check for\nUpdates…" => "Verificar\natualizações…",
+        "Look for a newer Local Sheets release" => "Procurar uma versão mais nova do Local Sheets",
         _ => return None,
     })
 }

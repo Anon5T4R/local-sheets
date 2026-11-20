@@ -466,6 +466,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "显示",
         "Collapse dialog" => "折叠对话框",
         "Expand dialog" => "展开对话框",
+        "Settings" => "设置",
+        "Exit" => "退出",
+        "Search commands" => "搜索命令",
+        "Paste the API key first: this provider asks for one." => "请先粘贴 API 密钥：此提供商需要密钥。",
+        "Choose a provider or type its address first." => "请先选择提供商或输入其地址。",
+        "Choose a model first (Fetch models lists them)." => "请先选择模型（“获取模型”会列出模型）。",
+        "Check for\nUpdates…" => "检查\n更新…",
+        "Look for a newer Local Sheets release" => "查看是否有更新的 Local Sheets 版本",
+        "Type a command, e.g. freeze, chart, bold…" => "输入命令，例如 冻结、图表、加粗…",
         _ => return None,
     })
 }

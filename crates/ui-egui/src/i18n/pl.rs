@@ -990,6 +990,13 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Pokaż",
         "Collapse dialog" => "Zwiń okno dialogowe",
         "Expand dialog" => "Rozwiń okno dialogowe",
+        "Settings" => "Ustawienia",
+        "Exit" => "Zakończ",
+        "Paste the API key first: this provider asks for one." => "Najpierw wklej klucz API: ten dostawca go wymaga.",
+        "Choose a provider or type its address first." => "Najpierw wybierz dostawcę lub wpisz jego adres.",
+        "Choose a model first (Fetch models lists them)." => "Najpierw wybierz model (Pobierz modele pokazuje listę).",
+        "Check for\nUpdates…" => "Sprawdź\naktualizacje…",
+        "Look for a newer Local Sheets release" => "Sprawdź, czy jest nowsza wersja Local Sheets",
         _ => return None,
     })
 }

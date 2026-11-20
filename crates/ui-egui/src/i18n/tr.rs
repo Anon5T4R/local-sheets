@@ -433,6 +433,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Göster",
         "Collapse dialog" => "İletişim kutusunu daralt",
         "Expand dialog" => "İletişim kutusunu genişlet",
+        "Settings" => "Ayarlar",
+        "Exit" => "Çıkış",
+        "Search commands" => "Komut ara",
+        "Paste the API key first: this provider asks for one." => "Önce API anahtarını yapıştırın: bu sağlayıcı bir anahtar ister.",
+        "Choose a provider or type its address first." => "Önce bir sağlayıcı seçin veya adresini yazın.",
+        "Choose a model first (Fetch models lists them)." => "Önce bir model seçin (Modelleri getir listeyi gösterir).",
+        "Check for\nUpdates…" => "Güncellemeleri\ndenetle…",
+        "Look for a newer Local Sheets release" => "Local Sheets'in daha yeni bir sürümünü ara",
+        "Type a command, e.g. freeze, chart, bold…" => "Bir komut yazın, ör. dondur, grafik, kalın…",
         _ => return None,
     })
 }

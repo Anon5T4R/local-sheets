@@ -994,6 +994,13 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Показати",
         "Collapse dialog" => "Згорнути діалогове вікно",
         "Expand dialog" => "Розгорнути діалогове вікно",
+        "Settings" => "Параметри",
+        "Exit" => "Вийти",
+        "Paste the API key first: this provider asks for one." => "Спершу вставте ключ API: цей провайдер його вимагає.",
+        "Choose a provider or type its address first." => "Спершу виберіть провайдера або введіть його адресу.",
+        "Choose a model first (Fetch models lists them)." => "Спершу виберіть модель (список покаже «Отримати моделі»).",
+        "Check for\nUpdates…" => "Перевірити\nоновлення…",
+        "Look for a newer Local Sheets release" => "Перевірити наявність новішої версії Local Sheets",
         _ => return None,
     })
 }

@@ -1000,6 +1000,13 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Mostra",
         "Collapse dialog" => "Comprimi finestra di dialogo",
         "Expand dialog" => "Espandi finestra di dialogo",
+        "Settings" => "Impostazioni",
+        "Exit" => "Esci",
+        "Paste the API key first: this provider asks for one." => "Incolla prima la chiave API: questo provider la richiede.",
+        "Choose a provider or type its address first." => "Scegli prima un provider o digita il suo indirizzo.",
+        "Choose a model first (Fetch models lists them)." => "Scegli prima un modello (Recupera modelli mostra l'elenco).",
+        "Check for\nUpdates…" => "Cerca\naggiornamenti…",
+        "Look for a newer Local Sheets release" => "Cerca una versione più recente di Local Sheets",
         _ => return None,
     })
 }

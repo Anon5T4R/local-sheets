@@ -996,6 +996,13 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Εμφάνιση",
         "Collapse dialog" => "Σύμπτυξη παραθύρου διαλόγου",
         "Expand dialog" => "Ανάπτυξη παραθύρου διαλόγου",
+        "Settings" => "Ρυθμίσεις",
+        "Exit" => "Έξοδος",
+        "Paste the API key first: this provider asks for one." => "Επικολλήστε πρώτα το κλειδί API: ο πάροχος το απαιτεί.",
+        "Choose a provider or type its address first." => "Επιλέξτε πρώτα πάροχο ή πληκτρολογήστε τη διεύθυνσή του.",
+        "Choose a model first (Fetch models lists them)." => "Επιλέξτε πρώτα μοντέλο (η Λήψη μοντέλων τα εμφανίζει).",
+        "Check for\nUpdates…" => "Έλεγχος για\nενημερώσεις…",
+        "Look for a newer Local Sheets release" => "Αναζήτηση νεότερης έκδοσης του Local Sheets",
         _ => return None,
     })
 }

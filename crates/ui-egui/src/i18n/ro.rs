@@ -1052,6 +1052,13 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Afișare",
         "Collapse dialog" => "Restrângere casetă de dialog",
         "Expand dialog" => "Extindere casetă de dialog",
+        "Settings" => "Setări",
+        "Exit" => "Ieșire",
+        "Paste the API key first: this provider asks for one." => "Lipiți mai întâi cheia API: acest furnizor o cere.",
+        "Choose a provider or type its address first." => "Alegeți mai întâi un furnizor sau tastați adresa lui.",
+        "Choose a model first (Fetch models lists them)." => "Alegeți mai întâi un model (Obține modelele afișează lista).",
+        "Check for\nUpdates…" => "Căutare\nactualizări…",
+        "Look for a newer Local Sheets release" => "Caută o versiune mai nouă a Local Sheets",
         _ => return None,
     })
 }

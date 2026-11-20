@@ -435,6 +435,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Hiện",
         "Collapse dialog" => "Thu gọn hộp thoại",
         "Expand dialog" => "Mở rộng hộp thoại",
+        "Settings" => "Cài đặt",
+        "Exit" => "Thoát",
+        "Search commands" => "Tìm lệnh",
+        "Paste the API key first: this provider asks for one." => "Hãy dán khóa API trước: nhà cung cấp này yêu cầu khóa.",
+        "Choose a provider or type its address first." => "Hãy chọn nhà cung cấp hoặc nhập địa chỉ của họ trước.",
+        "Choose a model first (Fetch models lists them)." => "Hãy chọn mô hình trước (Lấy mô hình sẽ liệt kê).",
+        "Check for\nUpdates…" => "Kiểm tra\ncập nhật…",
+        "Look for a newer Local Sheets release" => "Tìm bản phát hành Local Sheets mới hơn",
+        "Type a command, e.g. freeze, chart, bold…" => "Nhập lệnh, ví dụ: cố định, biểu đồ, in đậm…",
         _ => return None,
     })
 }

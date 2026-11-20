@@ -463,6 +463,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Prikaži",
         "Collapse dialog" => "Skupi dijalog",
         "Expand dialog" => "Proširi dijalog",
+        "Settings" => "Podešavanja",
+        "Exit" => "Izlaz",
+        "Search commands" => "Pretraži komande",
+        "Paste the API key first: this provider asks for one." => "Prvo nalepite API ključ: ovaj provajder ga traži.",
+        "Choose a provider or type its address first." => "Prvo izaberite provajdera ili unesite njegovu adresu.",
+        "Choose a model first (Fetch models lists them)." => "Prvo izaberite model (Preuzmi modele prikazuje listu).",
+        "Check for\nUpdates…" => "Proveri\nispravke…",
+        "Look for a newer Local Sheets release" => "Potraži noviju verziju programa Local Sheets",
+        "Type a command, e.g. freeze, chart, bold…" => "Unesite komandu, npr. zamrzni, grafikon, podebljano…",
         _ => return None,
     })
 }

@@ -474,6 +474,15 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "표시",
         "Collapse dialog" => "대화 상자 축소",
         "Expand dialog" => "대화 상자 확장",
+        "Settings" => "설정",
+        "Exit" => "종료",
+        "Search commands" => "명령 검색",
+        "Paste the API key first: this provider asks for one." => "먼저 API 키를 붙여넣으세요. 이 제공업체는 키가 필요합니다.",
+        "Choose a provider or type its address first." => "먼저 제공업체를 선택하거나 주소를 입력하세요.",
+        "Choose a model first (Fetch models lists them)." => "먼저 모델을 선택하세요(모델 가져오기에서 목록을 볼 수 있습니다).",
+        "Check for\nUpdates…" => "업데이트\n확인…",
+        "Look for a newer Local Sheets release" => "Local Sheets의 새 릴리스를 확인합니다",
+        "Type a command, e.g. freeze, chart, bold…" => "명령을 입력하세요(예: 틀 고정, 차트, 굵게)…",
         _ => return None,
     })
 }

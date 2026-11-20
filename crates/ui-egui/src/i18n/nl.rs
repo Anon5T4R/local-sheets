@@ -543,6 +543,14 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Weergeven",
         "Collapse dialog" => "Dialoogvenster samenvouwen",
         "Expand dialog" => "Dialoogvenster uitvouwen",
+        "Settings" => "Instellingen",
+        "Exit" => "Afsluiten",
+        "Paste the API key first: this provider asks for one." => "Plak eerst de API-sleutel: deze provider vraagt erom.",
+        "Choose a provider or type its address first." => "Kies eerst een provider of typ het adres ervan.",
+        "Choose a model first (Fetch models lists them)." => "Kies eerst een model (Modellen ophalen toont de lijst).",
+        "Check for\nUpdates…" => "Zoeken naar\nupdates…",
+        "Look for a newer Local Sheets release" => "Zoeken naar een nieuwere versie van Local Sheets",
+        "Type a command, e.g. freeze, chart, bold…" => "Typ een opdracht, bijv. blokkeren, grafiek, vet…",
         _ => return None,
     })
 }

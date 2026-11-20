@@ -584,6 +584,14 @@ pub(super) fn translate(text: &str) -> Option<&'static str> {
         "Show" => "Zobrazit",
         "Collapse dialog" => "Sbalit dialogové okno",
         "Expand dialog" => "Rozbalit dialogové okno",
+        "Settings" => "Nastavení",
+        "Exit" => "Ukončit",
+        "Paste the API key first: this provider asks for one." => "Nejprve vložte klíč API: tento poskytovatel jej vyžaduje.",
+        "Choose a provider or type its address first." => "Nejprve vyberte poskytovatele nebo zadejte jeho adresu.",
+        "Choose a model first (Fetch models lists them)." => "Nejprve vyberte model (seznam zobrazí Načíst modely).",
+        "Check for\nUpdates…" => "Vyhledat\naktualizace…",
+        "Look for a newer Local Sheets release" => "Vyhledat novější verzi Local Sheets",
+        "Type a command, e.g. freeze, chart, bold…" => "Zadejte příkaz, např. ukotvit, graf, tučné…",
         _ => return None,
     })
 }

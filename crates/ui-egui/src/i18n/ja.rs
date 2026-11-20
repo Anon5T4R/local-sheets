@@ -1198,6 +1198,13 @@ pub(super) const EXTRA: &[(&str, &str)] = &[
     ),
     ("Format\nTable", "表を\n書式設定"),
     ("Format the selected table with a preset", "選択した表をスタイルで書式設定します"),
+    ("Settings", "設定"),
+    ("Exit", "終了"),
+    ("Paste the API key first: this provider asks for one.", "先に API キーを貼り付けてください。このプロバイダーには必要です。"),
+    ("Choose a provider or type its address first.", "先にプロバイダーを選ぶか、そのアドレスを入力してください。"),
+    ("Choose a model first (Fetch models lists them).", "先にモデルを選んでください（モデルを取得で一覧が表示されます）。"),
+    ("Check for\nUpdates…", "更新を\n確認…"),
+    ("Look for a newer Local Sheets release", "Local Sheets の新しいリリースを確認します"),
 ];
 
 /// Translates an interface label; `None` for a label the catalog does not know, so `i18n.rs` can
