@@ -110,7 +110,7 @@ fn ribbon_selects_system_and_fixed_modes_ignore_subsequent_os_changes() {
     assert_appearance(&h, false);
     h.state_mut().run("ui.ribbonTab", json!({"tab": "View"})).unwrap();
     h.run_steps(2);
-    select_ribbon_theme(&mut h, "System");
+    select_ribbon_theme(&mut h, "Automatic");
     assert_eq!(preferences(&h)["systemTheme"], true);
     assert_eq!(h.ctx.theme(), Theme::Dark);
     assert_appearance(&h, true);
@@ -169,26 +169,60 @@ fn title_bar_switch_and_file_menu_choose_the_theme() {
     let mut h = harness(UiState::default());
     system_theme(&mut h, Some(Theme::Light));
     assert_appearance(&h, false);
-    h.get_by_role_and_label(egui::accesskit::Role::CheckBox, "Dark Mode").click();
+    // The title bar's theme button cycles Automatic, Light, Dark; it stands on Light here.
+    h.get_by_label("Theme: Light").click();
     h.run_steps(2);
     assert_eq!(preferences(&h)["dark"], true);
     assert_eq!(preferences(&h)["systemTheme"], false);
     assert_appearance(&h, true);
-    h.get_by_role_and_label(egui::accesskit::Role::CheckBox, "Dark Mode").click();
+    h.get_by_label("Theme: Dark").click();
     h.run_steps(2);
+    assert_eq!(preferences(&h)["systemTheme"], true);
     assert_appearance(&h, false);
 
     // File opens Backstage; its Options page holds the Office Theme choice (#331).
     h.get_by_label("File").click();
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Button, "Options").click();
+    // The title bar's gear is also named Settings; the Backstage entry is the later one.
+    h.get_all_by_role_and_label(egui::accesskit::Role::Button, "Settings").last().expect("the Backstage Settings entry").click();
     h.run_steps(3);
     // The first combo box on the page is Display theme.
     h.get_all_by_role(egui::accesskit::Role::ComboBox).next().expect("theme combo").click();
     h.run_steps(3);
-    h.get_by_label("System").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Button, "Automatic").click();
     h.run_steps(3);
     assert_eq!(preferences(&h)["systemTheme"], true);
     system_theme(&mut h, Some(Theme::Dark));
     assert_appearance(&h, true);
+}
+
+/// The suite's title-bar controls: the theme button cycles Automatic, Light, Dark; the gear opens
+/// File > Settings; the magnifier opens the command search and running a command from it works.
+#[test]
+fn title_bar_theme_button_gear_and_magnifier() {
+    let mut h = harness(UiState::default());
+    for (now, system, dark) in [("Light", false, true), ("Dark", true, true), ("Automatic", false, false)] {
+        h.get_by_label(&format!("Theme: {now}")).click();
+        h.run_steps(3);
+        let prefs = preferences(&h);
+        assert_eq!(prefs["systemTheme"], system, "after {now}");
+        if !system {
+            assert_eq!(prefs["dark"], dark, "after {now}");
+        }
+    }
+    h.get_by_label("Search commands").click();
+    h.run_steps(3);
+    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("commandSearch"), "the magnifier opens the command search");
+    // A command picked in the search runs, and the search closes.
+    // The search box has the focus when it opens.
+    h.input_mut().events.push(egui::Event::Text("freeze top row".into()));
+    h.run_steps(3);
+    h.get_by_label_contains("Freeze Top Row").click();
+    h.run_steps(3);
+    assert!(h.state().dialog.is_none());
+    assert!(h.state().session.journal.iter().any(|(id, _)| id == "view.freezeTopRow"), "the picked command ran");
+    assert!(h.state().backstage.is_none());
+    h.get_by_label("Settings").click();
+    h.run_steps(3);
+    assert!(h.state().backstage.as_ref().is_some_and(|b| b.page.id() == "options"), "the gear opens File > Settings");
 }

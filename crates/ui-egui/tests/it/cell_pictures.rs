@@ -44,12 +44,17 @@ fn confirm(h: &mut egui_kittest::Harness<'static, SheetApp>) {
     h.run_steps(6);
 }
 
+/// The suite's icons (`craft-icons`) are SVG textures tinted with the text colour; a picture is drawn untinted.
+fn is_tinted_icon(mesh: &egui::epaint::Mesh) -> bool {
+    mesh.vertices.iter().any(|v| v.color != egui::Color32::WHITE)
+}
+
 fn image_meshes(h: &egui_kittest::Harness<'static, SheetApp>) -> Vec<(Rect, Rect)> {
     h.output()
         .shapes
         .iter()
         .filter_map(|shape| match &shape.shape {
-            Shape::Mesh(mesh) if mesh.texture_id != TextureId::default() => {
+            Shape::Mesh(mesh) if mesh.texture_id != TextureId::default() && !is_tinted_icon(mesh) => {
                 let mut bounds = Rect::NOTHING;
                 for vertex in &mesh.vertices {
                     bounds.extend_with(vertex.pos);

@@ -17,12 +17,17 @@ fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     crate::support::blank_harness(4)
 }
 
+/// The suite's icons (`craft-icons`) are SVG textures tinted with the text colour; a picture is drawn untinted.
+fn is_tinted_icon(mesh: &egui::epaint::Mesh) -> bool {
+    mesh.vertices.iter().any(|v| v.color != egui::Color32::WHITE)
+}
+
 fn picture_textures(h: &egui_kittest::Harness<'static, SheetApp>) -> Vec<TextureId> {
     h.output()
         .shapes
         .iter()
         .filter_map(|shape| match &shape.shape {
-            Shape::Mesh(mesh) if mesh.texture_id != TextureId::default() => Some(mesh.texture_id),
+            Shape::Mesh(mesh) if mesh.texture_id != TextureId::default() && !is_tinted_icon(mesh) => Some(mesh.texture_id),
             _ => None,
         })
         .collect()
