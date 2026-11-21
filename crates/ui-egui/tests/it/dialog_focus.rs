@@ -247,3 +247,33 @@ fn command_search_hides_disabled_and_handles_missing_shortcuts() {
         h.get_by_label_contains("Align Right    Home");
     }
 }
+
+/// The palette closes on a click outside it and stays open on a click inside, like the suite's
+/// `craft-palette` (the magnifier that opens it is outside, but that click belongs to its own frame).
+#[test]
+fn command_search_closes_on_click_outside_but_not_inside() {
+    use egui::{Modifiers, PointerButton, Pos2, pos2};
+
+    fn click(h: &mut egui_kittest::Harness<'static, SheetApp>, pos: Pos2) {
+        h.input_mut().events.extend([
+            Event::PointerMoved(pos),
+            Event::PointerButton { pos, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE },
+        ]);
+        h.run_steps(1);
+        h.input_mut().events.push(Event::PointerButton { pos, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+        h.run_steps(2);
+    }
+
+    let mut h = harness();
+    h.state_mut().open_dialog("commandSearch", json!({}));
+    h.run_steps(6);
+    let rect = h.state().dialog.as_ref().and_then(|d| d.rect()).expect("the palette is shown");
+
+    // Inside the window, on the frame's left edge (no widget there): stays open.
+    click(&mut h, rect.left_center() + egui::vec2(3.0, 0.0));
+    assert!(h.state().dialog.is_some(), "a click inside does not close the palette");
+
+    // Outside (top-left corner of the window): closes.
+    click(&mut h, pos2(4.0, 4.0));
+    assert!(h.state().dialog.is_none(), "a click outside closes the palette");
+}

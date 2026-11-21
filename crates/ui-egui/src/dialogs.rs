@@ -84,6 +84,9 @@ pub struct Dialog {
     original_link_text: Option<String>,
     /// The state of the dialog's reference boxes (RefEdit).
     refs: ref_edit::RefBoxes,
+    /// Painted frames since the dialog opened. The first one still carries the click (or key) that
+    /// opened it, so outside-click-to-close waits for the second.
+    pub(crate) age: u32,
 }
 
 /// A formula box in point mode, as in Excel: a click on the grid writes the cell's absolute
@@ -109,6 +112,11 @@ struct RefPick {
 impl Dialog {
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The window's last painted rectangle (for tests).
+    pub fn rect(&self) -> Option<egui::Rect> {
+        self.refs.rect
     }
 
     /// Sets a form value. In Zoom, a Magnification choice is also the percentage `view.zoom`
@@ -232,6 +240,7 @@ impl Dialog {
             pick: None,
             original_link_text: None,
             refs: ref_edit::RefBoxes::default(),
+            age: 0,
         }
     }
 
@@ -257,6 +266,7 @@ impl Dialog {
             pick: None,
             original_link_text: None,
             refs: ref_edit::RefBoxes::default(),
+            age: 0,
         }
     }
 

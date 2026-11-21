@@ -33,7 +33,7 @@ pub(super) struct RefBoxes {
     pub(super) collapsed: Option<String>,
     /// Where the expanded dialog was last drawn: the collapsed dialog keeps its top-left corner,
     /// and the expanded one comes back where it was.
-    rect: Option<egui::Rect>,
+    pub(crate) rect: Option<egui::Rect>,
     /// The dialog was drawn collapsed last frame.
     was_collapsed: bool,
     /// A text field other than the collapsed box (the Name Box, say) owned the keyboard when

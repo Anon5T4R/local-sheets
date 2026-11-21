@@ -121,9 +121,41 @@ pub(crate) fn build_params(d: &Dialog) -> Json {
     v
 }
 
+/// Hyperlinks inside dialogs (About ▸ Contributors) open through the host's `open_url`, since
+/// the native shell has no browser integration of its own.
+fn forward_open_urls(app: &SheetApp, ctx: &egui::Context) {
+    if let Some(open_url) = &app.services.open_url {
+        let urls: Vec<String> = ctx.output_mut(|o| {
+            let mut urls = vec![];
+            o.commands.retain(|c| match c {
+                egui::OutputCommand::OpenUrl(u) => {
+                    urls.push(u.url.clone());
+                    false
+                }
+                _ => true,
+            });
+            urls
+        });
+        for u in urls {
+            open_url(&u);
+        }
+    }
+}
+
+/// The command palette behaves like the suite's `craft-palette`: a click outside it closes it.
+/// Not on its opening frame, which still carries the click that opened it (the magnifier).
+fn palette_clicked_outside(d: &Dialog, rect: Option<egui::Rect>, ctx: &egui::Context) -> bool {
+    d.name == "commandSearch"
+        && d.age > 1
+        && rect.is_some_and(|rect| {
+            ctx.input(|i| i.pointer.any_pressed()) && ctx.input(|i| i.pointer.interact_pos()).is_some_and(|pos| !rect.contains(pos))
+        })
+}
+
 /// Takes and draws the active dialog, dispatches its body by name, consumes picture-inbox results, runs OK/confirm commands, handles Esc/close and restores the back-dialog stack.
 pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
     let Some(mut d) = app.dialog.take() else { return };
+    d.age += 1;
     let home = app.ui_window();
     // The macro step editor is a large resizable window of its own.
     if d.name == "macroEditor" {
@@ -376,25 +408,9 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
                 _ => form(app, ui, &mut d, &mut confirm, &mut open),
             }
         });
+    let window_rect = shown.as_ref().map(|r| r.response.rect);
     window_shown(ctx, &mut d, collapsed.is_some(), shown.map(|r| r.response.rect));
-    // Hyperlinks inside dialogs (About ▸ Contributors) open through the host's `open_url`, since
-    // the native shell has no browser integration of its own.
-    if let Some(open_url) = &app.services.open_url {
-        let urls: Vec<String> = ctx.output_mut(|o| {
-            let mut urls = vec![];
-            o.commands.retain(|c| match c {
-                egui::OutputCommand::OpenUrl(u) => {
-                    urls.push(u.url.clone());
-                    false
-                }
-                _ => true,
-            });
-            urls
-        });
-        for u in urls {
-            open_url(&u);
-        }
-    }
+    forward_open_urls(app, ctx);
     if ctx.input(|i| i.key_pressed(Key::Escape)) || !win_open {
         // In Solver Options, Escape (or closing the window) cancels the options only.
         if in_solver_options(&d) {
@@ -402,6 +418,10 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
         } else {
             open = false;
         }
+    }
+    // The command palette behaves like the suite's `craft-palette`: a click outside it closes it.
+    if palette_clicked_outside(&d, window_rect, ctx) {
+        open = false;
     }
     if confirm && d.name == "insertPicture" && d.picture_target != app.view_key() {
         app.message = Some((d.title.clone(), "Return to the original worksheet to insert this picture, or cancel and choose another cell.".into()));
