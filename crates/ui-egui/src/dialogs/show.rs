@@ -612,7 +612,7 @@ fn track_pick(pick: &mut RefPick, r: &egui::Response, typed: bool) {
 pub(super) fn form_fields(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog) {
     // Field labels, choices and notes are English source strings, translated as they are drawn.
     let lang = crate::i18n::current(ui.ctx());
-    egui::Grid::new("form").num_columns(1).max_col_width(ui.available_width()).spacing(vec2(8.0, 6.0)).show(ui, |ui| {
+    egui::Grid::new("form").num_columns(1).spacing(vec2(8.0, 6.0)).show(ui, |ui| {
         for f in d.fields.clone() {
             match f {
                 Field::Text { key, label } => {
@@ -716,9 +716,19 @@ pub(super) fn form_fields(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog) {
                 }
                 Field::Note(t) => {
                     // A note can carry user data (a URL, a file or sheet name); `tr` reads a `|` as a
-                    // context separator, so such a note is shown as it is.
+                    // context separator, so such a note is shown as it is. It is laid out here, not
+                    // by `Label`, so a long unbroken token breaks anywhere and never widens the
+                    // dialog past the window.
                     let text = if t.contains('|') { t.as_str() } else { lang.tr(&t) };
-                    ui.label(egui::RichText::new(text).small());
+                    let mut job = egui::text::LayoutJob::simple(
+                        text.to_string(),
+                        crate::theme::ui_font(11.0),
+                        ui.visuals().text_color(),
+                        ui.available_width().clamp(80.0, 320.0),
+                    );
+                    job.wrap.break_anywhere = true;
+                    let galley = ui.ctx().fonts_mut(|f| f.layout_job(job));
+                    ui.add(egui::Label::new(egui::WidgetText::Galley(galley)));
                 }
             }
             ui.end_row();
