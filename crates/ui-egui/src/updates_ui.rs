@@ -25,6 +25,14 @@ impl Default for Runtime {
     }
 }
 
+impl SheetApp {
+    /// Offers `release` as the background check does, so a test can measure the card.
+    #[doc(hidden)]
+    pub fn offer_update(&mut self, release: craft_update::Release) {
+        self.updates_rt.updater.offer(release);
+    }
+}
+
 /// Ask for a check; the next frame's `tick` starts it. A manual one reports every outcome.
 pub(crate) fn start(app: &mut SheetApp, manual: bool) {
     if manual {

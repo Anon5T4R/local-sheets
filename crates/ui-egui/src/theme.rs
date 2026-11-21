@@ -385,6 +385,11 @@ mod contrast_tests {
         }
         add("text on pressed", t.text, t.pressed, TEXT);
         add("accent text (File, contextual tabs) on window", t.accent, t.window, TEXT);
+        // Hyperlinks are drawn in the accent (`visuals.hyperlink_color`): they must pass as body text
+        // on the shell, in the dialogs (which fill with `menu_bg`) and on a field.
+        add("accent link on window", t.accent, t.window, TEXT);
+        add("accent link on dialog", t.accent, t.menu_bg, TEXT);
+        add("accent link on input", t.accent, t.input_bg, TEXT);
         for (name, bg) in [("ribbon", t.ribbon), ("menu", t.menu_bg), ("hover", t.hover), ("pressed", t.pressed)] {
             for c in Cat::ALL {
                 add(&format!("{c:?} icon colour on {name}"), t.cat(c), bg, GLYPH);

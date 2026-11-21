@@ -178,7 +178,7 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
     let mut open = true;
     let mut win_open = true;
     let mut confirm = false;
-    let width = match d.name.as_str() {
+    let width: f32 = match d.name.as_str() {
         "formatCells" => 560.0,
         "about" => 660.0,
         "insertFunction" | "commandSearch" | "nameManager" | "manageRules" | "journal" | "agents" | "equation" => 520.0,
@@ -190,6 +190,10 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
         "pasteSpecial" => 480.0,
         _ => 380.0,
     };
+    // A dialog never grows past the window. The suite's dialogs are designed wider than the
+    // window's minimum (About is 660 pt against a 640 pt window), so the width is capped here and
+    // the content wraps inside it instead of making the window unreachable on the sides.
+    let width: f32 = width.min(ctx.content_rect().width() - 24.0).max(200.0);
     let window_id = egui::Id::unique("dialog").with(&d.name);
     let window = egui::Window::new(app.ui.language.tr(&d.title))
         .id(window_id)
@@ -213,6 +217,7 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
                 return;
             }
             ui.set_min_width(width - 20.0);
+            ui.set_max_width(width - 20.0);
             match d.name.as_str() {
                 "formatCells" => format_cells(app, ui, &mut d, &mut confirm),
                 "dataValidation" => data_validation_form(app, ui, &mut d, &mut confirm, &mut open),
@@ -607,7 +612,7 @@ fn track_pick(pick: &mut RefPick, r: &egui::Response, typed: bool) {
 pub(super) fn form_fields(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog) {
     // Field labels, choices and notes are English source strings, translated as they are drawn.
     let lang = crate::i18n::current(ui.ctx());
-    egui::Grid::new("form").num_columns(1).spacing(vec2(8.0, 6.0)).show(ui, |ui| {
+    egui::Grid::new("form").num_columns(1).max_col_width(ui.available_width()).spacing(vec2(8.0, 6.0)).show(ui, |ui| {
         for f in d.fields.clone() {
             match f {
                 Field::Text { key, label } => {

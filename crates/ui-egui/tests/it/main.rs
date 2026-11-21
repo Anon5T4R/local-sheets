@@ -73,6 +73,7 @@ mod menu_hover;
 mod merge_center_label;
 mod merged_cells;
 mod more_colors;
+mod narrow_windows;
 mod native_print;
 mod nowrap_line_breaks;
 mod number_stored_as_text;
