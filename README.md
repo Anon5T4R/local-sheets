@@ -58,10 +58,7 @@ Local Sheets is in alpha (see the [roadmap](ROADMAP.md)). Today it can:
 - **Run everywhere**: one Rust codebase for desktop and the web; no subscription, no licence
   server, no telemetry.
 
-The honest picture, area by area, is in [ROADMAP.md](ROADMAP.md),
-[docs/target-app-parity.md](docs/target-app-parity.md),
-[docs/gaps.md](docs/gaps.md) and the generated
-[docs/parity-checklist.md](docs/parity-checklist.md).
+The honest picture, area by area, is in [ROADMAP.md](ROADMAP.md).
 
 ## Getting started
 
@@ -150,19 +147,15 @@ pointer and keyboard input, dialogs and screenshots. See [`docs/mcp.md`](docs/mc
 | L7 | apps | `localsheets` (desktop), `localsheets-cli`, `localsheets-web` |
 
 `cargo xtask ci` runs formatting, clippy, the tests, the asset-attribution check, the layering
-check, the wasm build and the generated parity and keytip checks. Contributor and agent
-instructions: [AGENTS.md](AGENTS.md).
+check, the wasm build and the generated keytip check. Contributor and agent instructions:
+[AGENTS.md](AGENTS.md).
 
 ## Roadmap
 
-Local Sheets is in **alpha**. It covers 89% of the standard ribbon commands in our catalog
-([`docs/parity-checklist.md`](docs/parity-checklist.md)) and 513 standard worksheet functions
-([`docs/function-parity.md`](docs/function-parity.md)); this is a parity inventory, not a count of
-working implementations. Weighted by what spreadsheet users rely on, we estimate it is about 50%
-ready for real work. Next up: XLSX fidelity on real-world files, very large workbooks and
-multi-threaded recalc, chart depth, text in every script, and .xls import. Stage, numbers and
-estimates are in [ROADMAP.md](ROADMAP.md); the ranked work list is
-[`docs/gaps.md`](docs/gaps.md).
+Local Sheets is in **alpha**: it opens, edits and saves spreadsheets for real work, and the way to
+"ready for real work" is in [ROADMAP.md](ROADMAP.md) (XLSX fidelity on real-world files, very large
+workbooks and multi-threaded recalc, chart depth, text in every script, `.xls` import, PivotTable
+depth, keyboard coverage and the remaining translations).
 
 ## Downloads
 
@@ -270,7 +263,7 @@ with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md).
 Local Sheets is an independent fork of [GridCraft](https://github.com/storytold/gridcraft),
 maintained by Anon5T4R in the Local suite. "GridCraft" and "ArtCraft" are names of the upstream
 project and its team; this repository and its packages use only the Local Sheets name.
-`UPSTREAM-SYNC.md` documents how changes are taken from the upstream and what stays local.
+`docs/UPSTREAM-SYNC.md` documents how changes are taken from the upstream and what stays local.
 
 <p align="center">
   <sub>Suíte Local — apps locais, sem conta, sem telemetria.</sub>

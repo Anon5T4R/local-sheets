@@ -39,14 +39,14 @@ Docs: `docs/mcp.md` e `docs/cli.md`.
 ```
 cargo build --locked          # debug
 cargo test --locked           # testes (no Windows: -- --test-threads=1, testes de UI); as fontes vendored entram sempre (.cargo/config.toml), igual ao CI
-cargo xtask ci                # o gate local: i18n, fmt, clippy, testes, assets, camadas, cargo-deny, espelhos do local-libs, wasm, parity
+cargo xtask ci                # o gate local: i18n, fmt, clippy, testes, assets, camadas, cargo-deny, espelhos do local-libs, wasm
 packaging/windows/package.ps1 # MSI + portable (Windows)
 packaging/linux/package.sh    # AppImage/deb/rpm/tar (Linux)
 ```
 
 Regras técnicas do código (never-crash, camadas, tudo é comando, wasm, política de assets):
-`docs/architecture.md`; o formato nativo e a compatibilidade com o upstream estão em
-`docs/file-format-parity.md`. Os nós cegos do rebrand, se algum, ficam em `docs/gaps.md`.
+`docs/architecture.md`; a sincronização com o upstream (o que entra e o que fica de fora):
+`docs/UPSTREAM-SYNC.md`. Estado e fila: `ROADMAP.md`.
 
 
 ## Upstream e a pasta `C:\Dev\storytold`

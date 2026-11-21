@@ -179,7 +179,7 @@ impl SheetApp {
         }
         // The web runner has no `RequestPaintWhileHidden`; sending it there only logs an
         // unhandled command. A visible tab still gets the repaint below; a hidden tab keeps the
-        // work queued (see the shared eframe follow-up in docs/egui-037-local-followups.md).
+        // work queued until eframe offers a shared paint-while-hidden path.
         #[cfg(not(target_arch = "wasm32"))]
         ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaintWhileHidden);
         ctx.request_repaint();
