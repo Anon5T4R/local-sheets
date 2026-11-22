@@ -422,7 +422,7 @@ fn the_guarded_entry_points_survive_hostile_input() {
 }
 
 #[test]
-#[allow(clippy::disallowed_methods)] // tests run only off wasm, where the clock exists
+#[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
 fn pathological_source_at_the_cap_finishes_in_bounded_time() {
     // Sources of exactly `MAX_SOURCE_BYTES` built to make a parser or a regular expression work
     // hardest: groups and delimiters nested to the depth cap, long runs of backslashes, braces and

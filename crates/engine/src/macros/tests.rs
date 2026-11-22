@@ -416,7 +416,7 @@ fn duplicate_names_at_the_length_limit_survive_save_and_reopen() {
 }
 
 #[test]
-#[allow(clippy::disallowed_methods)] // a native-only timing test: the clock is read off wasm
+#[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
 fn many_hidden_macro_names_are_read_in_one_pass() {
     // A hostile file with many damaged macro items: only the first MAX_MACROS are read, and the
     // names are gathered and removed in one pass instead of one scan of every name per item.

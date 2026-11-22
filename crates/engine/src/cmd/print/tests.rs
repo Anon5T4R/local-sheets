@@ -898,7 +898,7 @@ fn the_fallback_text_is_clipped_to_the_equation_frame() {
 }
 
 #[test]
-#[allow(clippy::disallowed_methods)] // tests run only off wasm, where the clock exists
+#[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
 fn an_equation_source_of_a_megabyte_prints_a_bounded_excerpt() {
     // A file can carry a source far past `MAX_SOURCE_BYTES` (the drawing part may be 512 MiB). It
     // never lays out, so the fallback prints the first 4,096 bytes and does no work on the rest:

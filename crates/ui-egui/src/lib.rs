@@ -8,7 +8,6 @@
 
 /// Local Sheets as craft-update knows it, with its 128 px icon and accent colour: the update
 /// prompt shows both, and an AppImage's menu entry gets the icon.
-#[cfg(not(target_arch = "wasm32"))]
 pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/com.local.localsheets.png")),
     accent: Some([0x1f, 0x9d, 0x55]),
@@ -26,7 +25,6 @@ mod craft_fonts_policy;
 pub mod credits;
 pub mod dialogs;
 pub mod dnd;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod doc_windows;
 pub mod editor;
 pub mod equation;
@@ -53,7 +51,6 @@ pub mod selection_glide;
 pub mod tabs;
 pub mod text_box;
 pub mod theme;
-#[cfg(not(target_arch = "wasm32"))]
 mod updates_ui;
 pub mod widgets;
 mod window_ui;
@@ -327,7 +324,6 @@ pub struct SheetApp {
     /// View › Arrange All's layout and windows, waiting for the native windows to move.
     pub arrange_windows: Option<(String, Vec<u64>)>,
     /// The update check, the startup prompt and a running self-update (desktop only).
-    #[cfg(not(target_arch = "wasm32"))]
     updates_rt: updates_ui::Runtime,
 }
 

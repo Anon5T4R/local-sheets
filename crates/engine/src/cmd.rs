@@ -389,9 +389,9 @@ fn wall_clock() -> std::time::Duration {
 }
 
 pub(crate) fn commit<R>(d: &mut DocState, f: impl FnOnce(&mut Ctx) -> Result<R>) -> Result<R> {
-    // `LOCALSHEETS_PROFILE` timing, never on wasm where the clock traps. `elapsed` on the epoch
+    // `LOCALSHEETS_PROFILE` timing. `elapsed` on the epoch
     // reads the wall clock without the (disallowed) `now`.
-    let t0 = if cfg!(target_arch = "wasm32") { None } else { std::env::var_os("LOCALSHEETS_PROFILE").map(|_| wall_clock()) };
+    let t0 = std::env::var_os("LOCALSHEETS_PROFILE").map(|_| wall_clock());
     let since = |t0: std::time::Duration| wall_clock().saturating_sub(t0);
     let mut sel = d.selection.clone();
     let mut ctx = Ctx {

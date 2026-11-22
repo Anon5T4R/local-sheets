@@ -2,7 +2,7 @@
 //! row-by-row `value_ref` loop from `grid.rs` vs. `Sheet::last_contiguous_nonempty`.
 //! `cargo run --release -p localsheets-engine --example fill_handle_perf -- [rows]`
 
-#![allow(clippy::disallowed_methods)] // a native-only benchmark: wasm never runs it
+#![allow(clippy::disallowed_methods)] // a benchmark: the clock is read on purpose
 
 use std::time::Instant;
 

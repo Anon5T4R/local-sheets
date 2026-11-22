@@ -975,7 +975,7 @@ mod equation_cache_tests {
     }
 
     #[test]
-    #[allow(clippy::disallowed_methods)] // tests run only off wasm, where the clock exists
+    #[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
     fn a_source_of_a_megabyte_is_looked_up_without_being_read() {
         // The sheet painter asks the cache every frame and the PDF export every draw; a source
         // read from a file can be megabytes, and the lookup must not scan it each time.

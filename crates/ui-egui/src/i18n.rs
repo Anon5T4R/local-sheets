@@ -175,14 +175,7 @@ impl Language {
     /// The system's preferred interface language, best effort; English when it is unknown or
     /// unsupported. Used as the first-run default while nothing is saved.
     pub fn system() -> Self {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            sys_locale::get_locale().and_then(|tag| Self::from_tag(&tag)).unwrap_or(Self::En)
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            web_sys::window().and_then(|window| window.navigator().language()).and_then(|tag| Self::from_tag(&tag)).unwrap_or(Self::En)
-        }
+        sys_locale::get_locale().and_then(|tag| Self::from_tag(&tag)).unwrap_or(Self::En)
     }
 
     pub fn formula_locale(self) -> localsheets_engine::formula::FormulaLocale {

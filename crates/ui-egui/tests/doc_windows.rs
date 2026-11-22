@@ -3,7 +3,6 @@
 //!
 //! The windows are drawn through a test backend that, like eframe, runs each immediate viewport
 //! as a nested pass with its own input, so a close button can be pressed on one window.
-#![cfg(not(target_arch = "wasm32"))]
 
 use std::cell::RefCell;
 

@@ -1,5 +1,4 @@
 use super::SheetApp;
-#[cfg(not(target_arch = "wasm32"))]
 use super::updates_ui;
 
 impl SheetApp {
@@ -43,17 +42,11 @@ impl SheetApp {
     /// Look for a newer release once, in the background, as the desktop app starts (a no-op on the
     /// web). A found release opens the update prompt; nothing is shown when Local Sheets is current.
     pub fn start_update_check(&mut self) {
-        #[cfg(not(target_arch = "wasm32"))]
         updates_ui::start(self, false);
     }
 
     /// Help ▸ Check for Updates…: look now, and say so when Local Sheets is up to date or the check fails.
     pub fn check_for_updates(&mut self) {
-        #[cfg(not(target_arch = "wasm32"))]
         updates_ui::start(self, true);
-        #[cfg(target_arch = "wasm32")]
-        {
-            self.message = Some(("Local Sheets".into(), "The web version is always the latest release.".into()));
-        }
     }
 }

@@ -109,7 +109,7 @@ fn serve_listener_with(listener: TcpListener, token: Arc<str>, ctx: egui::Contex
 
 /// Read the connection's first line (at most [`control_auth::MAX_AUTH_LINE`] bytes, within
 /// `timeout` in total) and check the token. `true` when the peer may go on.
-#[allow(clippy::disallowed_methods)] // the desktop app (native only): wasm never runs it
+#[allow(clippy::disallowed_methods)] // the desktop app reads the clock here on purpose
 fn authenticate(reader: &mut BufReader<TcpStream>, out: &mut TcpStream, token: &str, timeout: Duration) -> bool {
     let deadline = Instant::now().checked_add(timeout).unwrap_or_else(Instant::now);
     let mut first = Vec::new();
@@ -130,7 +130,7 @@ fn authenticate(reader: &mut BufReader<TcpStream>, out: &mut TcpStream, token: &
 /// The timeout goes on the handle the reader reads: on Windows a `try_clone` of the stream keeps
 /// its own, so one set on the writing half never fired (a silent peer held its thread forever).
 /// It is shortened before every read, so a peer sending one byte at a time can't stretch it.
-#[allow(clippy::disallowed_methods)] // the desktop app (native only): wasm never runs it
+#[allow(clippy::disallowed_methods)] // the desktop app reads the clock here on purpose
 fn read_auth_line(reader: &mut BufReader<TcpStream>, line: &mut Vec<u8>, deadline: Instant) -> std::io::Result<()> {
     let max = control_auth::MAX_AUTH_LINE;
     while line.len() < max && line.last() != Some(&b'\n') {

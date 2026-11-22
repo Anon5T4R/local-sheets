@@ -1,4 +1,3 @@
-#[cfg(not(target_arch = "wasm32"))]
 use super::Blob;
 use super::font_fallback::load_fallback;
 use super::{Arc, Color32, FontData, FontDefinitions, FontFamily, FontId};
@@ -129,7 +128,6 @@ pub(crate) fn font_parses(bytes: &[u8], index: u32) -> bool {
 
 /// Loads the first candidate that exists and parses. A file that exists but can't be parsed is
 /// skipped with a warning and the next candidate is tried.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn try_load(paths: &[(&str, u32)]) -> Option<FontData> {
     for (p, index) in paths {
         if let Some(blob) = font_file(p, *index) {
@@ -144,7 +142,6 @@ pub(super) fn try_load(paths: &[(&str, u32)]) -> Option<FontData> {
 /// engine, because every one of these files is loaded by every font rebuild for as long as the
 /// app runs. Only a file that parses is kept: a missing or broken one is looked for again next
 /// time.
-#[cfg(not(target_arch = "wasm32"))]
 fn font_file(path: &str, index: u32) -> Option<Blob> {
     static FILES: std::sync::Mutex<std::collections::BTreeMap<String, Blob>> = std::sync::Mutex::new(std::collections::BTreeMap::new());
     let mut files = FILES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -183,14 +180,12 @@ const HACK: &str = "Hack";
 
 /// The permitted craft-fonts faces with their `FontDefinitions` keys, in manifest order. Empty
 /// without a `CRAFT_FONTS_DIR` checkout at build time. The filter is repeated here so a stale
-/// generated table can never smuggle in a barred face or a web-build face outside the allowlist.
+/// generated table can never smuggle in a barred face.
 pub(super) fn craft_font_faces() -> Vec<(String, &'static CraftFont)> {
-    let wasm = cfg!(target_arch = "wasm32");
     craft_fonts::CRAFT_FONTS
         .iter()
         .enumerate()
         .filter(|(_, font)| !crate::craft_fonts_policy::barred(font.family))
-        .filter(|(_, font)| !wasm || crate::craft_fonts_policy::web_allowed(font.family, font.style))
         .map(|(i, font)| (format!("craft-{i}-{}-{}", font.family, font.style), font))
         .collect()
 }
@@ -259,11 +254,6 @@ pub fn craft_fonts_cover(text: &str) -> bool {
         let map = font.charmap();
         text.chars().filter(|c| !c.is_whitespace()).all(|c| map.map(c).is_some())
     })
-}
-
-#[cfg(target_arch = "wasm32")]
-pub(super) fn try_load(_paths: &[(&str, u32)]) -> Option<FontData> {
-    None
 }
 
 fn home_fonts(file: &str) -> String {

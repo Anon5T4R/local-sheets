@@ -3230,7 +3230,6 @@ name = "localsheets-core"
 version = "0.2.13"
 dependencies = [
  "chrono",
- "js-sys",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -3342,7 +3341,6 @@ dependencies = [
  "skrifa",
  "sys-locale",
  "toml",
- "web-sys",
  "web-time",
 ]
 

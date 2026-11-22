@@ -20,7 +20,7 @@
 //!   the best member. It stops when the population has converged, when the best member stops
 //!   improving, or at the evaluation budget.
 //!
-//! Work is bounded by an evaluation budget (no clock: `Instant` traps on wasm). The model is
+//! Work is bounded by an evaluation budget, not by the clock. The model is
 //! saved as hidden sheet-scoped names (`solver_opt`, `solver_adj`, `solver_lhs1`…), so it
 //! travels with the workbook through XLSX.
 
