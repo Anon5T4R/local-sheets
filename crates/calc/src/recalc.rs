@@ -543,7 +543,7 @@ fn fill_spill(sheet: &mut localsheets_model::Sheet, anchor: CellRef, range: Rang
     sheet.spill_ranges.insert(anchor, range);
 }
 
-/// Current date-time as a serial (1900 system), from the system clock (browser clock on wasm).
+/// Current date-time as a serial (1900 system), from the system clock.
 /// UTC; the local offset isn't available without platform calls. Falls back to a fixed date only
 /// when no clock is available.
 pub fn now_serial() -> f64 {

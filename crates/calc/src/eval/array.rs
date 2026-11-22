@@ -113,8 +113,8 @@ fn try_zip2(a: &Value, b: &Value, mut f: impl FnMut(&Value, &Value) -> Option<Va
 /// Cell count of a `rows`×`cols` broadcast result, or `None` when it would exceed [`MAX_CELLS`].
 /// Each operand passes its own size cap, but their broadcast product can be far larger
 /// (`SEQUENCE(1048576)*SEQUENCE(1,16384)` is 17 billion cells), so it is checked before allocating.
-/// The product is formed in `u64`: on wasm32 `usize` is 32 bits, where a `usize` product above
-/// `u32::MAX` would wrap (2^32 cells → 0) and slip past the cap.
+/// The product is formed in `u64`: a `usize` product above
+/// `u32::MAX` would wrap on a 32-bit target (2^32 cells → 0) and slip past the cap.
 pub(super) fn broadcast_len(rows: usize, cols: usize) -> Option<usize> {
     let cells = u64::try_from(rows).ok()?.checked_mul(u64::try_from(cols).ok()?)?;
     if cells > MAX_CELLS {
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(broadcast_len(1, MAX_CELLS as usize), Some(MAX_CELLS as usize));
     }
 
-    /// `65_536 * 65_536` is 2^32. Multiplied as `usize` on wasm32 it wraps to 0, which a
+    /// `65_536 * 65_536` is 2^32. Multiplied as `usize` on a 32-bit target it wraps to 0, which a
     /// `> MAX_CELLS` test would let through; the guard must reject the true product.
     #[test]
     fn broadcast_len_rejects_a_product_that_wraps_to_zero_on_32_bits() {

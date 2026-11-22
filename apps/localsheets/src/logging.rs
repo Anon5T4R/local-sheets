@@ -17,7 +17,7 @@
 //! written once the file is attached. Writing never panics: a file that can't be created or
 //! written leaves standard error as the only sink.
 //!
-//! This is the desktop app's logger only; `localsheets-cli` and `localsheets-web` set up their own.
+//! This is the desktop app's logger only; `localsheets-cli` sets up its own.
 
 use std::fs::File;
 use std::io::Write;

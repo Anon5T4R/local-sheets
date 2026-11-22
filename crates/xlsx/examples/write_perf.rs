@@ -4,7 +4,7 @@
 //! The workbook mixes what a large business sheet holds: repeated and unique text, integers,
 //! decimals, dates, booleans, formulas with cached values, a few styles, a header row and a
 //! second summary sheet. Prints each run and the median / minimum of `write_xlsx`.
-#![allow(clippy::disallowed_methods)] // a native-only benchmark: wasm never runs it
+#![allow(clippy::disallowed_methods)] // a benchmark: the clock is read on purpose
 
 use std::time::Instant;
 

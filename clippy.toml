@@ -3,12 +3,12 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
 
-# The web app (wasm32-unknown-unknown) has no clock: these trap (`RuntimeError: unreachable`)
-# instead of returning. Read the clock only off wasm (`cfg(not(target_arch = "wasm32"))` or
-# `cfg!`) and allow the lint at that call.
+# The app reads the clock through the crate's own helpers (`crate::clock::now_ms` and
+# `monotonic_ms`), so screenshot deadlines, autosave pacing and tests share one source. A direct
+# `Instant::now`/`SystemTime::now` is a deliberate exception: allow the lint at that call.
 disallowed-methods = [
-    { path = "std::time::Instant::now", reason = "traps on wasm; read the clock only off wasm" },
-    { path = "std::time::SystemTime::now", reason = "traps on wasm; read the clock only off wasm" },
+    { path = "std::time::Instant::now", reason = "read the clock through crate::clock; allow the lint at a deliberate exception" },
+    { path = "std::time::SystemTime::now", reason = "read the clock through crate::clock; allow the lint at a deliberate exception" },
 ]
 
 disallowed-types = [

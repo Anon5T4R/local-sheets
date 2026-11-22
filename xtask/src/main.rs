@@ -23,14 +23,13 @@ usage: cargo xtask <command>
 
 commands:
   fmt             fmt --check for the workspace's own packages (never the vendored trees in libs/)
-  ci              i18n-report, fmt --check, clippy -D warnings, test, doctest, assets, layers, cargo-deny, local-libs mirrors, wasm,
+  ci              i18n-report, fmt --check, clippy -D warnings, test, doctest, assets, layers, cargo-deny, local-libs mirrors,
                   parity --check, keytips --check (stops at the first failure; the parity check runs
                   only if docs/parity-checklist.md exists)
   test            workspace tests (cargo nextest when installed, else cargo test), then doctests
   assets          check that every icon/image/font/sample file is attributed in ATTRIBUTION.md
   i18n-report     list the interface strings each language doesn't translate yet (always passes)
   layers          enforce the crate dependency layering (AGENTS.md \"Layering\")
-  wasm            cargo check --target wasm32-unknown-unknown for the L0-L5 crates (+ localsheets-web), one call
   parity [--check] [--out PATH]
                   write docs/parity-checklist.md from localsheets_engine::catalog (implemented vs missing ids)
   keytips [--check]
@@ -50,7 +49,6 @@ fn main() -> ExitCode {
         Some("i18n-report") => i18n_report::run(&root()),
         Some("layers") => cmd_layers(),
         Some("fmt") => cmd_fmt(),
-        Some("wasm") => cmd_wasm(),
         Some("test") => cmd_test().and_then(|()| cmd_doctest()),
         Some("ci") => cmd_ci(),
         Some("stats") => stats::run(&root(), rest.contains(&"--exact")),
@@ -142,40 +140,6 @@ fn cmd_layers() -> Result<(), String> {
     }
 }
 
-/// Workspace packages that must build for wasm32: every L0–L5 crate, plus the web app once it
-/// exists (`apps/localsheets-web`).
-fn wasm_set() -> Result<Vec<String>, String> {
-    let crates = layers::from_metadata(&metadata()?)?;
-    Ok(crates
-        .into_iter()
-        .filter(|c| match layers::classify(&c.name) {
-            Some(layers::Class::Layer(l)) => l <= 5 || c.name == "localsheets-web",
-            _ => false,
-        })
-        .map(|c| c.name)
-        .collect())
-}
-
-/// One `cargo check` for the whole set; `--keep-going` reports every failing crate, not just the
-/// first.
-fn cmd_wasm() -> Result<(), String> {
-    let set = wasm_set()?;
-    if set.is_empty() {
-        return Err("no wasm crates found in the workspace".into());
-    }
-    let mut c = cargo();
-    c.args(["check", "--target", "wasm32-unknown-unknown", "--keep-going"]);
-    for p in &set {
-        c.args(["-p", p]);
-    }
-    let r = run(c, &format!("cargo check --target wasm32-unknown-unknown --keep-going -p {}", set.join(" -p ")));
-    println!("\nwasm32-unknown-unknown check ({}): {}", set.join(", "), if r.is_ok() { "ok" } else { "FAIL" });
-    if r.is_err() {
-        println!("(if the target is missing: rustup target add wasm32-unknown-unknown)");
-    }
-    r
-}
-
 /// Targets for the test build. Examples are left out so they aren't linked; clippy
 /// `--all-targets` still compiles them.
 const TEST_TARGETS: [&str; 4] = ["--workspace", "--lib", "--bins", "--tests"];
@@ -225,7 +189,6 @@ fn cmd_ci() -> Result<(), String> {
         ("layers", Box::new(cmd_layers)),
         ("deny", Box::new(cmd_deny)),
         ("mirror", Box::new(cmd_mirror)),
-        ("wasm", Box::new(cmd_wasm)),
         (
             "parity",
             Box::new(|| {

@@ -25,8 +25,8 @@ including tests, 2026-10-10.
 | L5 | `engine` | ~17.7k | `Session`: open workbooks, selection, history (COW snapshots), clipboard, fill, sort, filter, PivotTables, what-if, print, file I/O (`io.rs`), and the command registry (`cmd/*`, 313 commands) with the Excel ribbon catalog (`catalog.rs`) |
 | L6 | `ui-egui` | ~11.6k | Excel-style UI (title bar, QAT, ribbon, formula bar, virtualised grid, editor, tabs, status bar, dialogs, task panes, chart view) and the control channel |
 | L6 | `mcp` | ~1.4k | MCP server over stdio (hand-written JSON-RPC), headless or bridged to a running app |
-| L7 | `apps/localsheets`, `apps/localsheets-cli`, `apps/localsheets-web` | ~2.2k | Desktop (eframe/wgpu), CLI (`info`, `convert`, `eval`, `cat`, `run`, `commands`, `functions`, `mcp`, `send`), web (WASM via trunk) |
-| — | `xtask` | — | `ci`, `parity`, `assets`, `layers`, `wasm`, `version`, `stats` |
+| L7 | `apps/localsheets`, `apps/localsheets-cli` | ~2.2k | Desktop (eframe/wgpu), CLI (`info`, `convert`, `eval`, `cat`, `run`, `commands`, `functions`, `mcp`, `send`) |
+| — | `xtask` | — | `ci`, `parity`, `assets`, `layers`, `version`, `stats` |
 
 ## Data flow
 
@@ -117,8 +117,8 @@ Actions made of many commands (macros, a debugger that runs one step per call) u
   `cell.*` and `range.*` command it journals, from any source (interface, control channel, MCP,
   script). It reads at most 2,000 of the formulas a command enters, starting from the last one
   (the most recent), so a large paste costs no more than that; `formulas.recentlyUsed` returns
-  it. It is kept with the other preferences (`prefs.json`, the browser's storage on the
-  web) and read leniently, so a malformed value loses only this list. It does not read the
+  it. It is kept with the other preferences (`prefs.json`) and read leniently, so a malformed
+  value loses only this list. It does not read the
   journal back, so the journal's trimming does not affect it.
 - **Recording buffer** (`record.rs`). `Session::start_recording` collects each successful
   top-level command with the document, sheet and selection it ran in, without secret parameters.
@@ -222,7 +222,7 @@ recorded in [`decisions.md`](decisions.md) and re-run by `crates/math/tests/gate
 ## Platforms and builds
 
 macOS universal, Windows x64/x86/arm64, Linux x86_64/aarch64/riscv64 (AppImage, Flatpak, deb,
-rpm, tarball), FreeBSD, and web (WASM; WebGPU or WebGL2). Release workflows in
+rpm, tarball), FreeBSD. Release workflows in
 `.github/workflows/release.yml`; see [`releasing.md`](releasing.md).
 
 ## Known architectural gaps

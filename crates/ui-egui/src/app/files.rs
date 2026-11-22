@@ -75,7 +75,7 @@ impl SheetApp {
             .collect()
     }
 
-    /// Opens files that arrived asynchronously (web file picker, dropped files).
+    /// Opens files that arrived asynchronously (file picker, dropped files).
     pub(super) fn poll_async_opens(&mut self) {
         let arrived: Vec<(String, Vec<u8>)> = self
             .services
@@ -86,7 +86,7 @@ impl SheetApp {
         for (name, bytes) in arrived {
             let b64 = localsheets_engine::io::base64_encode(&bytes);
             match self.run("file.open", json!({"name": &name, "base64": &b64})) {
-                // A file picked from File › Open (web) arrives here: show it, not the Backstage.
+                // A file picked from File › Open arrives here: show it, not the Backstage.
                 Ok(r) => {
                     self.backstage = None;
                     self.show_open_warnings(&r);

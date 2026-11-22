@@ -1,8 +1,6 @@
-#[cfg(not(target_arch = "wasm32"))]
 use super::Arc;
 use super::FontDefinitions;
 use super::font_setup::HanOrder;
-#[cfg(not(target_arch = "wasm32"))]
 use super::font_setup::{in_dirs, try_load};
 
 /// Loads the system non-Latin fallback faces (one file per script family) and returns their keys so
@@ -10,7 +8,6 @@ use super::font_setup::{in_dirs, try_load};
 /// without this a Thai, Hebrew, Japanese or Chinese workbook shows tofu boxes even though the text
 /// was read correctly. With a face installed those scripts get real glyphs instead of tofu; nothing
 /// is bundled, and a machine without the face keeps the old behaviour.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn load_fallback(fonts: &mut FontDefinitions, han: HanOrder) -> Vec<String> {
     let mut keys = Vec::new();
     // Files already loaded as a fallback face. A file serves at most one key: the region-merged
@@ -33,16 +30,10 @@ pub(super) fn load_fallback(fonts: &mut FontDefinitions, han: HanOrder) -> Vec<S
     keys
 }
 
-#[cfg(target_arch = "wasm32")]
-pub(super) fn load_fallback(_fonts: &mut FontDefinitions, _han: HanOrder) -> Vec<String> {
-    Vec::new()
-}
-
 /// Every fallback face we look for, in chain order: `(key, candidate files)`. One file per script
 /// family is enough — epaint picks the first face with the glyph, and a script's glyphs live in one
 /// file. Order only matters between faces that both cover a glyph (Japanese vs Chinese kanji), so
 /// the interface language reorders the two Han entries and nothing else.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn fallback_faces(han: HanOrder) -> Vec<(&'static str, Vec<(String, u32)>)> {
     let ja = ("sys-cjk-han-ja", cjk_han_japanese());
     let zh = ("sys-cjk-han-zh", cjk_han_simplified());
@@ -66,7 +57,6 @@ pub(super) fn fallback_faces(han: HanOrder) -> Vec<(&'static str, Vec<(String, u
 /// `truetype/wqy`), Fedora (`google-noto-cjk`), Arch (`noto-cjk`, `wenquanyi`), ChromeOS's Linux
 /// container (`chromeos/notocjk`, #1762), plus local and
 /// flat layouts. Flatpak exposes the same host layouts through read-only font mounts.
-#[cfg(not(target_arch = "wasm32"))]
 const LINUX_CJK_DIRS: [&str; 22] = [
     // Flatpak mounts host fonts here without a broad filesystem permission. Keep the same
     // distribution layouts as below; /usr/share/fonts inside the sandbox belongs to the runtime.
@@ -95,14 +85,12 @@ const LINUX_CJK_DIRS: [&str; 22] = [
 ];
 
 /// The Windows fonts folder (`%WINDIR%\Fonts`, or the default install location).
-#[cfg(not(target_arch = "wasm32"))]
 fn windows_fonts() -> String {
     std::env::var("WINDIR").map(|w| format!("{w}\\Fonts")).unwrap_or_else(|_| "C:\\Windows\\Fonts".into())
 }
 
 /// The Noto Sans CJK faces for one locale (`jp`, `sc`, `kr`): the per-locale OTF, then the
 /// region-merged TTC at `face`, in every Linux font directory.
-#[cfg(not(target_arch = "wasm32"))]
 fn noto_cjk(locale: &str, face: u32) -> Vec<(String, u32)> {
     let mut v = Vec::new();
     for d in LINUX_CJK_DIRS {
@@ -117,7 +105,6 @@ fn noto_cjk(locale: &str, face: u32) -> Vec<(String, u32)> {
 /// The region-merged `NotoSansCJK-Regular.ttc` holds one face per locale (JP 0, KR 1, SC 2, TC 3,
 /// HK 4) with the same glyph coverage, so the index only picks glyph shapes. Whichever Han list
 /// comes first loads it; [`load_fallback`] does not load the same file again for the other.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn cjk_han_japanese() -> Vec<(String, u32)> {
     let mac = "/System/Library/Fonts";
     let win = windows_fonts();
@@ -131,7 +118,6 @@ pub(super) fn cjk_han_japanese() -> Vec<(String, u32)> {
 
 /// Simplified Chinese Han faces. Loaded apart from the Japanese ones so a glyph one family lacks
 /// (simplified-only hanzi in a Japanese font) still falls through to a real glyph.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn cjk_han_simplified() -> Vec<(String, u32)> {
     let mac = "/System/Library/Fonts";
     let win = windows_fonts();
@@ -153,7 +139,6 @@ pub(super) fn cjk_han_simplified() -> Vec<(String, u32)> {
 
 /// Hangul faces (Korean). The Han faces above that come from the region-merged Noto Sans CJK file
 /// already carry Hangul; [`load_fallback`] then skips this list rather than load the file twice.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn cjk_hangul() -> Vec<(String, u32)> {
     let mac = "/System/Library/Fonts";
     let win = windows_fonts();
@@ -166,7 +151,6 @@ pub(super) fn cjk_hangul() -> Vec<(String, u32)> {
 
 /// Thai faces. Windows ships Leelawadee UI and Tahoma/Microsoft Sans Serif (both carry Thai);
 /// Linux font directories searched by the Thai and Hebrew faces, in priority order.
-#[cfg(not(target_arch = "wasm32"))]
 fn linux_noto_dirs() -> [&'static str; 5] {
     [
         "/usr/share/fonts/truetype/noto",
@@ -179,7 +163,6 @@ fn linux_noto_dirs() -> [&'static str; 5] {
 
 /// Faces for one script: Windows files under `WINDIR\Fonts` first, then macOS paths, then the
 /// Noto/Linux files in every [`linux_noto_dirs`] directory, then the Fedora variable font.
-#[cfg(not(target_arch = "wasm32"))]
 fn script_fonts(win: &[&str], mac: &[&str], lin_files: &[&str], variable: &str) -> Vec<(String, u32)> {
     let w = windows_fonts();
     let mut v: Vec<(String, u32)> = win.iter().map(|f| (format!("{w}\\{f}"), 0)).collect();
@@ -190,7 +173,6 @@ fn script_fonts(win: &[&str], mac: &[&str], lin_files: &[&str], variable: &str) 
 }
 
 /// macOS has Thonburi; Linux usually has Noto Sans Thai or Garuda.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn thai() -> Vec<(String, u32)> {
     script_fonts(
         // Leelawadee UI, Tahoma, Microsoft Sans Serif
@@ -204,7 +186,6 @@ pub(super) fn thai() -> Vec<(String, u32)> {
 
 /// Lao faces. Windows ships Leelawadee UI (and DokChampa on older versions); macOS has Lao Sangam
 /// MN and Lao MN; Linux usually has Noto Sans Lao or Phetsarath OT.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn lao() -> Vec<(String, u32)> {
     let mac_sup = "/System/Library/Fonts/Supplemental";
     let win = windows_fonts();
@@ -225,7 +206,6 @@ pub(super) fn lao() -> Vec<(String, u32)> {
 
 /// Hebrew faces. Windows has David and FrankRuehl (and Tahoma/Courier New carry Hebrew); macOS has
 /// Arial Hebrew and David; Linux usually has Noto Sans Hebrew or DejaVu Sans.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn hebrew() -> Vec<(String, u32)> {
     script_fonts(
         // David, FrankRuehl, Tahoma
@@ -248,7 +228,6 @@ pub(super) fn hebrew() -> Vec<(String, u32)> {
 /// which then render as empty boxes (#197, #54). DejaVu Sans covers most of them; the paths cover
 /// Debian/Ubuntu, Fedora and Arch layouts. [`load_fallback`] skips the file if Hebrew already
 /// loaded it.
-#[cfg(not(target_arch = "wasm32"))]
 fn symbols() -> Vec<(String, u32)> {
     let win = std::env::var("WINDIR").map(|w| format!("{w}\\Fonts")).unwrap_or_else(|_| "C:\\Windows\\Fonts".into());
     let mut v: Vec<(String, u32)> = vec![(format!("{win}\\seguisym.ttf"), 0), ("/System/Library/Fonts/Apple Symbols.ttf".into(), 0)];
@@ -268,7 +247,6 @@ fn symbols() -> Vec<(String, u32)> {
 
 /// A second symbol face for what the first lacks (⌘ and other technical symbols): Noto Sans
 /// Symbols 2 where it is installed, or Segoe UI Symbol behind Segoe UI.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn symbols_more() -> Vec<(String, u32)> {
     let mut v: Vec<(String, u32)> = Vec::new();
     for d in [
@@ -287,12 +265,5 @@ pub(super) fn symbols_more() -> Vec<(String, u32)> {
 
 /// Whether any symbol fallback face is installed (tests skip their glyph checks without one).
 pub fn symbol_face_installed() -> bool {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        symbols().iter().chain(symbols_more().iter()).any(|(p, _)| std::path::Path::new(p).exists())
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        false
-    }
+    symbols().iter().chain(symbols_more().iter()).any(|(p, _)| std::path::Path::new(p).exists())
 }

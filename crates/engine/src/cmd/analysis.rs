@@ -2404,7 +2404,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::disallowed_methods)] // a native-only timing test: the clock is read off wasm
+    #[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
     fn binomial_and_poisson_draws_at_the_limits_are_tabulated_quickly() {
         let mut s = s();
         // The tables cover the outcomes around the mode, not every one of the 1,000,001 for a

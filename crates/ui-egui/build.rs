@@ -42,20 +42,18 @@ fn main() {
 ///
 /// Local Sheets never copies font bytes into this repository and never reads a fixture from Cargo
 /// configuration: the only input is the environment variable. Barred Adobe/Source/Noto CJK faces
-/// stay in the shared repository for other consumers but are filtered here. A web build embeds
-/// only the explicit `WEB_ALLOWED` faces (no CJK collection). Native builds additionally opt into
+/// stay in the shared repository for other consumers but are filtered here. The build also opts into
 /// craft-fonts' `fonts/simplified-chinese-manifest.txt` (the OFL LXGW face DeckCraft uses): it is
-/// optional for ordinary builds and required for `CRAFT_FONTS_REQUIRED=1` native builds.
+/// optional for ordinary builds and required for `CRAFT_FONTS_REQUIRED=1` builds.
 fn emit_craft_fonts() {
     println!("cargo::rerun-if-env-changed=CRAFT_FONTS_DIR");
     println!("cargo::rerun-if-env-changed=CRAFT_FONTS_REQUIRED");
     let required = craft_fonts_policy::required_mode(std::env::var("CRAFT_FONTS_REQUIRED").ok().as_deref());
-    let wasm = std::env::var("CARGO_CFG_TARGET_ARCH").is_ok_and(|a| a == "wasm32");
     let mut src = String::new();
     let _ = writeln!(src, "pub static CRAFT_FONTS_REQUIRED: bool = {required};");
     src.push_str("pub static CRAFT_FONTS: &[CraftFont] = &[\n");
     match std::env::var_os("CRAFT_FONTS_DIR").map(std::path::PathBuf::from) {
-        Some(dir) => match craft_fonts(&dir, wasm, required) {
+        Some(dir) => match craft_fonts(&dir, required) {
             Ok(entries) => src.push_str(&entries),
             Err(e) if required => {
                 println!("cargo::error=CRAFT_FONTS_DIR={}: {e}", dir.display());
@@ -75,7 +73,7 @@ fn emit_craft_fonts() {
 }
 
 /// One `CraftFont { .. }` initialiser per manifest row Local Sheets may embed.
-fn craft_fonts(dir: &std::path::Path, wasm: bool, required: bool) -> Result<String, String> {
+fn craft_fonts(dir: &std::path::Path, required: bool) -> Result<String, String> {
     let manifest = dir.join("fonts/manifest.txt");
     println!("cargo::rerun-if-changed={}", manifest.display());
     let text = std::fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
@@ -84,14 +82,14 @@ fn craft_fonts(dir: &std::path::Path, wasm: bool, required: bool) -> Result<Stri
     if required {
         craft_fonts_policy::check_required(&rows)?;
     }
-    let chinese = if wasm { Vec::new() } else { chinese_font_rows(dir, required)? };
+    let chinese = chinese_font_rows(dir, required)?;
     for row in rows.iter().chain(&chinese) {
         if craft_fonts_policy::barred(&row.family) {
             println!("cargo::warning=craft-fonts: not embedding {} {} (repository asset policy)", row.family, row.style);
         }
     }
     let mut out = String::new();
-    for row in craft_fonts_policy::embeddable(&rows, wasm).into_iter().chain(craft_fonts_policy::embeddable(&chinese, wasm)) {
+    for row in craft_fonts_policy::embeddable(&rows).into_iter().chain(craft_fonts_policy::embeddable(&chinese)) {
         let path = dir.join(&row.file).canonicalize().map_err(|e| format!("{}: {e}", row.file))?;
         println!("cargo::rerun-if-changed={}", path.display());
         let scripts: Vec<String> = row.scripts.iter().map(|s| format!("{s:?}")).collect();

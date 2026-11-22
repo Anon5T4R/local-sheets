@@ -378,30 +378,22 @@ fn holds(v: &Value, wanted: localsheets_model::ColType) -> &'static str {
 
 // ---------------------------------------------------------------- the machine
 
-/// A stopwatch for the time limit. `Instant::now` traps on wasm, so there it measures nothing.
+/// A stopwatch for the time limit.
 #[derive(Clone, Copy, Debug)]
 pub struct Stopwatch {
-    #[cfg(not(target_arch = "wasm32"))]
     start: std::time::Instant,
 }
 
 impl Stopwatch {
     pub fn start() -> Stopwatch {
-        #[cfg(not(target_arch = "wasm32"))]
-        #[allow(clippy::disallowed_methods)] // never on wasm (see above)
+        #[allow(clippy::disallowed_methods)]
         let w = Stopwatch { start: std::time::Instant::now() };
-        #[cfg(target_arch = "wasm32")]
-        let w = Stopwatch {};
         w
     }
 
-    /// Milliseconds since the start, or `None` where there is no clock.
+    /// Milliseconds since the start.
     fn elapsed_ms(&self) -> Option<f64> {
-        #[cfg(not(target_arch = "wasm32"))]
-        let ms = Some(self.start.elapsed().as_secs_f64() * 1000.0);
-        #[cfg(target_arch = "wasm32")]
-        let ms = None;
-        ms
+        Some(self.start.elapsed().as_secs_f64() * 1000.0)
     }
 }
 

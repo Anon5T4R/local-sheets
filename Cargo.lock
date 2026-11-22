@@ -3230,7 +3230,6 @@ name = "localsheets-core"
 version = "0.2.13"
 dependencies = [
  "chrono",
- "js-sys",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -3342,25 +3341,7 @@ dependencies = [
  "skrifa",
  "sys-locale",
  "toml",
- "web-sys",
  "web-time",
-]
-
-[[package]]
-name = "localsheets-web"
-version = "0.2.13"
-dependencies = [
- "eframe",
- "egui",
- "js-sys",
- "localsheets-engine",
- "localsheets-ui-egui",
- "log",
- "rfd",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

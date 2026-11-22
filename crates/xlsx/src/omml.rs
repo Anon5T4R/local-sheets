@@ -712,7 +712,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::disallowed_methods)] // tests run only off wasm, where the clock exists
+    #[allow(clippy::disallowed_methods)] // a timing test: the clock is read on purpose
     fn latex_past_the_source_cap_stops_converting_and_falls_back() {
         // 100,000 sibling runs: the conversion stops once its LaTeX exceeds the cap that
         // `localsheets_math::check` enforces, instead of building the whole string and then

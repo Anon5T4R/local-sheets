@@ -15,12 +15,11 @@ Files, binaries and ids stay lowercase (`localsheets-<version>-<platform>-<arch>
 | Bundle / app id `com.local.localsheets` | `packaging/macos/Info.plist.in`, `packaging/linux/*`, flatpak manifest |
 | WiX UpgradeCode `55FDA4F8-0254-4A96-8AA0-3D6DA79AD606` (fixed forever) | `packaging/windows/localsheets.wxs` |
 | File types `.xlsx` `.xlsm` `.xlsb` `.ods` `.csv` `.tsv` | Info.plist (`CFBundleDocumentTypes`), WiX (ProgIds/OpenWithProgids), `.desktop` `MimeType=`, `com.local.localsheets.mime.xml`, metainfo |
-| Web app dir `apps/localsheets-web` | `packaging/web/package.sh` |
 | App colour `#1f9d55` (ink `#147a40`), **proposed** | `assets/app-icon/README.md`, metainfo `<branding>` |
 
 ## Application release prerequisites
 
-The `apps/localsheets` and `apps/localsheets-web` crates are workspace members, and
+The `apps/localsheets` and `apps/localsheets-cli` crates are workspace members, and
 `apps/localsheets-cli` supports `--version`. The `cargo xtask` alias is defined in
 `.cargo/config.toml`. The current app-specific release setup includes:
 
@@ -81,8 +80,7 @@ The `apps/localsheets` and `apps/localsheets-web` crates are workspace members, 
 
 The other packagers in `packaging/` are run by hand, not by `release.yml`: macOS
 (`packaging/macos/package.sh`), Windows x86/ARM64 (`package.ps1 -Arch`), FreeBSD
-(`packaging/freebsd/package.sh`), Flatpak (`packaging/linux/flatpak*.sh`) and the web site
-(`packaging/web/package.sh`).
+(`packaging/freebsd/package.sh`) and Flatpak (`packaging/linux/flatpak*.sh`).
 
 ### macOS
 
@@ -178,13 +176,6 @@ GitHub has no FreeBSD runners, so there is no FreeBSD workflow. `packaging/freeb
 builds the release binaries on FreeBSD and writes `localsheets-<v>-freebsd-x86_64.tar.gz`
 (`bin/` + `share/`, extract under `/usr/local`). No signing (checksums are in `SHA256SUMS.txt`).
 
-### Web
-
-`packaging/web/package.sh` runs `trunk build --release --dist dist/web --public-url ./` in
-`apps/localsheets-web` and zips the site with sample `_headers` / `.htaccess` and the hosting guide
-([`packaging/web/README.md`](../packaging/web/README.md)). Relative URLs only, so it works under
-any path and in an iframe; the script fails on root-absolute URLs.
-
 ## Secrets
 
 Every secret is optional: with one missing, that platform's artifacts are unsigned and the log
@@ -215,5 +206,5 @@ file has a row in `ATTRIBUTION.md` (`cargo xtask assets`).
   `cargo test --locked --no-fail-fast` (serial on Windows, where the kittest UI tests collide in
   parallel). A second job rejects any `git+` source in `Cargo.lock`.
 - `.github/workflows/release.yml`, on `v*` tags: the Windows and Linux packages above.
-- Locally: `cargo xtask ci` (fmt, clippy, tests, doctests, assets, layers, wasm, parity, keytips),
+- Locally: `cargo xtask ci` (fmt, clippy, tests, doctests, assets, layers, parity, keytips),
   and `pwsh packaging/windows/package.ps1 -SkipBuild` after a release build to re-package.

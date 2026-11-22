@@ -46,7 +46,6 @@ pub const TABLE: &[(&str, Class)] = &[
     // L7 apps (exempt) and tooling (unchecked)
     ("localsheets", Class::Layer(7)),
     ("cli", Class::Layer(7)),
-    ("web", Class::Layer(7)),
     ("xtask", Class::Exempt),
 ];
 
@@ -310,7 +309,7 @@ mod tests {
 
     #[test]
     fn apps_and_xtask_exempt() {
-        for app in ["localsheets", "localsheets-cli", "localsheets-web", "xtask"] {
+        for app in ["localsheets", "localsheets-cli", "xtask"] {
             assert!(check(&[c(app, &[("egui", Normal, false), ("localsheets-ui-egui", Normal, true)])]).is_empty());
         }
     }

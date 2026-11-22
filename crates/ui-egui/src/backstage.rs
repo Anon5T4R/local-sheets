@@ -393,8 +393,8 @@ fn recent_list(app: &mut SheetApp, ui: &mut Ui, bs: &mut Backstage, out: &mut Ou
     let width = ui.available_width().min(CONTENT_W);
     // What the file system has said so far; the rest arrives in later frames (see `RecentFiles`).
     let known = bs.recent.known(ui.ctx(), &app.ui.recent);
-    // The web build has no files to ask about, and a narrow window leaves the names their room.
-    let modified_w = if cfg!(target_arch = "wasm32") || width < 420.0 { 0.0 } else { MODIFIED_W };
+    // A narrow window leaves the names their room.
+    let modified_w = if width < 420.0 { 0.0 } else { MODIFIED_W };
     if modified_w > 0.0 {
         let (head, _) = ui.allocate_exact_size(vec2(width, 20.0), Sense::hover());
         ui.painter().text(
@@ -477,7 +477,6 @@ impl RecentFiles {
 }
 
 /// Starts the thread that asks. Returns whether it started.
-#[cfg(not(target_arch = "wasm32"))]
 fn ask(ctx: egui::Context, paths: Vec<String>, found: Arc<Mutex<HashMap<String, Modified>>>) -> bool {
     /// Lets the next list ask, however the thread ends.
     struct Done;
@@ -496,12 +495,6 @@ fn ask(ctx: egui::Context, paths: Vec<String>, found: Arc<Mutex<HashMap<String, 
         }
     });
     asking.is_ok()
-}
-
-/// The web build has no file system to ask.
-#[cfg(target_arch = "wasm32")]
-fn ask(_ctx: egui::Context, _paths: Vec<String>, _found: Arc<Mutex<HashMap<String, Modified>>>) -> bool {
-    false
 }
 
 /// How long ago, in words. The clock's time zone isn't known here, so the list tells ages rather
@@ -586,7 +579,7 @@ fn open_page(app: &mut SheetApp, ui: &mut Ui, bs: &mut Backstage, out: &mut Outc
     if square_button(ui, Icon::OpenFolder, lang.tr("Browse…")).clicked() {
         let before = app.session.active().map(|d| d.uid);
         app.open_dialog("open", json!({}));
-        // Desktop pickers return at once; the web picker delivers later (see `SheetApp::logic`).
+        // The picker delivers on a later frame (see `SheetApp::logic`).
         if app.session.active().map(|d| d.uid) != before {
             out.close = true;
         }

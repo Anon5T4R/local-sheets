@@ -19,6 +19,16 @@ serde_json = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
 chrono = { workspace = true }
+# Same vendored craft-libs tree as the workspace's craft-update and craft-window (see the root
+# Cargo.toml).
+craft-print = { path = "../../libs/craft-libs/crates/print/" }
+craft-update = { workspace = true }
+craft-desktop-theme = { workspace = true }
+rfd = { workspace = true }
+arboard = { workspace = true, features = ["image-data"] }
+localsheets-mcp = { workspace = true }
+# The control channel's token (OS random numbers); already in the tree.
+getrandom = "0.4"
 
 [build-dependencies]
 # Icon + VERSIONINFO for localsheets.exe; build.rs only uses it when the target is Windows.
@@ -30,18 +40,6 @@ winit = { version = "0.30", default-features = false, features = ["x11"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 # Retain X11 fallback; draw Wayland client-side controls without bundled title fonts.
 winit = { version = "0.30", default-features = false, features = ["x11", "wayland-csd-adwaita-notitle"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# Same vendored craft-libs tree as the workspace's craft-update and craft-window (see the root
-# Cargo.toml).
-craft-print = { path = "../../libs/craft-libs/crates/print/" }
-craft-update = { workspace = true }
-craft-desktop-theme = { workspace = true }
-rfd = { workspace = true }
-arboard = { workspace = true, features = ["image-data"] }
-localsheets-mcp = { workspace = true }
-# The control channel's token (OS random numbers); already in the tree.
-getrandom = "0.4"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 arboard = { workspace = true, features = ["image-data", "wayland-data-control"] }

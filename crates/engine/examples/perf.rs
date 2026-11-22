@@ -1,7 +1,7 @@
 //! Performance scenarios on large workbooks (release build):
 //! `cargo run --release -p localsheets-engine --example perf -- [rows]`
 
-#![allow(clippy::disallowed_methods)] // a native-only benchmark: wasm never runs it
+#![allow(clippy::disallowed_methods)] // a benchmark: the clock is read on purpose
 
 use std::time::Instant;
 

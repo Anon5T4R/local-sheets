@@ -898,12 +898,10 @@ fn script_sandbox_check(path: &str) -> Result<()> {
     Ok(())
 }
 
-/// The largest native file the reader still touches: its own cap plus one, used to stop
+/// The largest file the reader still touches: its own cap plus one, used to stop
 /// reads whose bytes arrive faster than metadata can claim (device files, growing files).
-#[cfg(not(target_arch = "wasm32"))]
 const MAX_READ_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub fn read_file(path: &str) -> Result<Vec<u8>> {
     use std::io::Read;
     script_sandbox_check(path)?;
@@ -922,13 +920,6 @@ pub fn read_file(path: &str) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-#[cfg(target_arch = "wasm32")]
-pub fn read_file(path: &str) -> Result<Vec<u8>> {
-    script_sandbox_check(path)?;
-    Err(EngineError::Other(format!("{path}: no file system in the browser")))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
 pub fn write_file(path: &str, bytes: &[u8]) -> Result<()> {
     use std::io::Write;
     script_sandbox_check(path)?;
@@ -964,12 +955,6 @@ pub fn write_file(path: &str, bytes: &[u8]) -> Result<()> {
         let _ = std::fs::remove_file(&tmp);
         EngineError::Other(format!("{path}: {e}"))
     })
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn write_file(path: &str, _bytes: &[u8]) -> Result<()> {
-    script_sandbox_check(path)?;
-    Err(EngineError::Other(format!("{path}: no file system in the browser")))
 }
 
 const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

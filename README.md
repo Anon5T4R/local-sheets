@@ -55,7 +55,7 @@ Local Sheets is in alpha (see the [roadmap](ROADMAP.md)). Today it can:
   self-contained PDF export.
 - **Automate**: every ribbon button, menu item, dialog, keystroke and mouse gesture is a command
   with undo, all scriptable from the CLI, a JSON control channel and an MCP server for AI agents.
-- **Run everywhere**: one Rust codebase for desktop and the web; no subscription, no licence
+- **Run everywhere**: one Rust codebase for Windows, macOS and Linux; no subscription, no licence
   server, no telemetry.
 
 The honest picture, area by area, is in [ROADMAP.md](ROADMAP.md).
@@ -69,7 +69,7 @@ cargo build --locked
 cargo run --release -p localsheets -- --sample sales        # the desktop app with the sample workbook
 cargo run --release -p localsheets -- book.xlsx             # open a workbook
 cargo run --release -p localsheets -- --sample sales --control 7979   # + JSON control channel
-cargo xtask ci                                              # fmt, clippy, tests, assets, layering, wasm
+cargo xtask ci                                              # fmt, clippy, tests, assets, layering
 ```
 
 The built-in samples are `sales` (quarterly sales dashboard), `budget` (household budget) and
@@ -86,16 +86,6 @@ Printing goes through the shared `craft-print` crate from `libs/craft-libs` (the
 CUPS `lp` elsewhere); PDF export uses the self-contained writer in
 [`crates/pdf`](crates/pdf/README.md), which has no dependencies and embeds no font files.
 
-### Web
-
-```sh
-cd apps/localsheets-web && trunk build --release     # → dist/web (serve it with any static server)
-cd apps/localsheets-web && trunk serve --release     # http://127.0.0.1:8771  (?sample=sales opens a sample)
-```
-
-You need [trunk](https://trunk-rs.github.io/trunk/) and the `wasm32-unknown-unknown` target. Open
-uses the browser's file picker (dropping files works too) and Save downloads the workbook.
-
 ### Logs
 
 The desktop app writes its `log` records to standard error and to `logs/localsheets.log` in the
@@ -111,8 +101,6 @@ only.
 | Variable | Effect |
 |---|---|
 | `RUST_LOG` | Log levels for standard error and the log file. Default: `info` for Local Sheets' own crates, `warn` for everything else. env_logger-style directives replace that, e.g. `RUST_LOG=debug`, `RUST_LOG=warn,localsheets_engine=debug` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`localsheets*=debug`). |
-
-The web app logs to the browser console instead.
 
 ## Agents, CLI and MCP
 
@@ -144,10 +132,10 @@ pointer and keyboard input, dialogs and screenshots. See [`docs/mcp.md`](docs/mc
 | L3 | `localsheets-chart` | toolkit-free chart layout and rendering |
 | L5 | `localsheets-engine` | session, commands, history, clipboard, fill, sort, filter, file I/O |
 | L6 | `localsheets-ui-egui`, `localsheets-mcp` | spreadsheet UI and control channel; MCP server |
-| L7 | apps | `localsheets` (desktop), `localsheets-cli`, `localsheets-web` |
+| L7 | apps | `localsheets` (desktop), `localsheets-cli` |
 
 `cargo xtask ci` runs formatting, clippy, the tests, the asset-attribution check, the layering
-check, the wasm build and the generated keytip check. Contributor and agent instructions:
+check and the generated keytip check. Contributor and agent instructions:
 [AGENTS.md](AGENTS.md).
 
 ## Roadmap
@@ -190,8 +178,8 @@ $env:WGPU_BACKEND = "vulkan"
 Remove-Item Env:WGPU_BACKEND                     # restore the default for later launches
 ```
 
-An explicit `gl` override can bring the driver crash back on affected systems. The macOS, Linux and
-web backend defaults are unchanged.
+An explicit `gl` override can bring the driver crash back on affected systems. The macOS and Linux
+backend defaults are unchanged.
 
 DirectX 12 shaders are compiled with FXC, which is part of Windows, so no `dxcompiler.dll` or
 `dxil.dll` is needed. `$env:WGPU_DX12_COMPILER = "dxc"` (or `"auto"`) selects wgpu's DXC handling
@@ -239,11 +227,10 @@ yet — this is what a build from source on musl needs at run time.
 Building from source on Linux needs `pkg-config libxkbcommon-dev libwayland-dev libx11-dev
 libxcursor-dev libxrandr-dev libxi-dev libgtk-3-dev libxcb1-dev`.
 
-### macOS, BSD and the web
+### macOS and BSD
 
 There is no published macOS or BSD artifact yet: both build from source with `cargo build
---locked` (the DMG and FreeBSD packaging in `packaging/` is kept for when there are). The web build
-is `trunk build --release` in `apps/localsheets-web`, hosted on any static server.
+--locked` (the DMG and FreeBSD packaging in `packaging/` is kept for when there are).
 
 ## The Local suite
 
