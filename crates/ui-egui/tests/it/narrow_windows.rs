@@ -1,4 +1,4 @@
-//! Every dialog and window of the app fits the window's minimum width (`with_min_inner_size` in
+//! Every dialog and window of the app fits the window's minimum size (`with_min_inner_size` in
 //! `apps/localsheets/src/main.rs`), with a workbook open and filled; the top bar, the command
 //! palette and the update card are measured too. The bounding boxes come from the accesskit tree,
 //! as `every_dialog_fits_the_narrow_window` does in the Local Keys suite.
@@ -13,6 +13,8 @@ use crate::common::{Harness, app, builder};
 
 /// The app's minimum inner width (`apps/localsheets/src/main.rs`).
 const MIN_WIDTH: f32 = 640.0;
+/// The app's minimum inner height (`apps/localsheets/src/main.rs`).
+const MIN_HEIGHT: f32 = 420.0;
 
 /// A workbook with data, a chart, a comment, a name and a second sheet: the dialogs draw their
 /// lists and previews instead of their empty states.
@@ -33,7 +35,7 @@ fn filled_session() -> Session {
 }
 
 fn harness_at(session: Session, width: f32) -> Harness {
-    let mut h = builder().with_size(egui::vec2(width, 560.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = builder().with_size(egui::vec2(width, MIN_HEIGHT)).with_step_dt(1.0 / 60.0).build_ui_state(
         |ui, app: &mut SheetApp| {
             let ctx = ui.ctx().clone();
             app.logic(&ctx);
@@ -45,40 +47,68 @@ fn harness_at(session: Session, width: f32) -> Harness {
     h
 }
 
-/// Every accesskit node of `root`'s subtree with a box stays inside the window's width.
+/// Where a window's content may go past the bottom edge: the body of a dialog whose controls do not
+/// fit scrolls, with its title and its buttons outside the `ScrollArea`. The accesskit tree reports
+/// the scrolled content unclipped, so what hangs below is accepted only when it comes before a
+/// vertical scroll bar inside the window and in its column; the bar is drawn after the content and
+/// the buttons after it.
+fn below_is_scrolled(root: &egui_kittest::Node<'_>, width: f32) -> impl Fn(usize, egui::accesskit::Rect) -> bool {
+    const TOL: f64 = 0.5;
+    let nodes: Vec<_> = root.children_recursive().collect();
+    let bars: Vec<(usize, egui::accesskit::Rect)> = nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, node)| {
+            let rect = node.accesskit_node().bounding_box()?;
+            let vertical = rect.y1 - rect.y0 > rect.x1 - rect.x0;
+            let inside = rect.x0 >= -TOL && rect.x1 <= f64::from(width) + TOL && rect.y0 >= -TOL && rect.y1 <= f64::from(MIN_HEIGHT) + TOL;
+            (node.accesskit_node().role() == Role::ScrollBar && vertical && inside).then_some((i, rect))
+        })
+        .collect();
+    move |i, rect| bars.iter().any(|&(bar_at, bar)| bar_at > i && rect.x1 <= bar.x1 + TOL && bar.y0 <= rect.y0 + TOL)
+}
+
+/// Every accesskit node of `root`'s subtree with a box stays inside the window, in both axes.
 fn assert_subtree_inside(root: &egui_kittest::Node<'_>, what: &str, width: f32) {
-    for node in root.children_recursive() {
+    let scrolled = below_is_scrolled(root, width);
+    for (i, node) in root.children_recursive().enumerate() {
         // A field's text runs past its own box (egui clips the drawing): the field is the node.
         if node.accesskit_node().role() == Role::TextRun {
             continue;
         }
         let Some(rect) = node.accesskit_node().bounding_box() else { continue };
-        if rect.width() > 0.0 {
-            assert!(
-                rect.x0 >= -0.5 && rect.x1 <= f64::from(width) + 0.5,
-                "{what}: {:?} outside the {width} pt window: {rect:?}",
-                node.accesskit_node().role()
-            );
+        if rect.width() <= 0.0 {
+            continue;
+        }
+        let role = node.accesskit_node().role();
+        assert!(rect.x0 >= -0.5 && rect.x1 <= f64::from(width) + 0.5, "{what}: {role:?} outside the {width} pt window: {rect:?}");
+        assert!(rect.y0 >= -0.5, "{what}: {role:?} above the window: {rect:?}");
+        if rect.y1 > f64::from(MIN_HEIGHT) + 0.5 && !scrolled(i, rect) {
+            panic!("{what}: {role:?} below the {MIN_HEIGHT} pt window and outside a scrolling body: {rect:?}");
         }
     }
 }
 
 /// Every node below the ribbon's scrollable rows (the grid, the tabs, the status bar and any
-/// foreground card drawn outside a window) fits the window's width.
+/// foreground card drawn outside a window) fits the window.
 fn assert_chrome_inside(harness: &Harness, what: &str, width: f32) {
-    for node in harness.root().children_recursive() {
+    let root = harness.root();
+    let scrolled = below_is_scrolled(&root, width);
+    for (i, node) in root.children_recursive().enumerate() {
         let Some(rect) = node.accesskit_node().bounding_box() else { continue };
         // The ribbon scrolls its card and its tab row horizontally by design (a narrow window
         // shows as many tabs as fit and the arrows scroll the rest); everything below it must fit.
         if rect.y1 <= 205.0 || node.accesskit_node().role() == Role::TextRun {
             continue;
         }
-        if rect.width() > 0.0 {
-            assert!(
-                rect.x0 >= -0.5 && rect.x1 <= f64::from(width) + 0.5,
-                "{what}: {:?} outside the {width} pt window: {rect:?}",
-                node.accesskit_node().role()
-            );
+        if rect.width() <= 0.0 {
+            continue;
+        }
+        let role = node.accesskit_node().role();
+        assert!(rect.x0 >= -0.5 && rect.x1 <= f64::from(width) + 0.5, "{what}: {role:?} outside the {width} pt window: {rect:?}");
+        assert!(rect.y0 >= -0.5, "{what}: {role:?} above the window: {rect:?}");
+        if rect.y1 > f64::from(MIN_HEIGHT) + 0.5 && !scrolled(i, rect) {
+            panic!("{what}: {role:?} below the {MIN_HEIGHT} pt window and outside a scrolling body: {rect:?}");
         }
     }
 }
@@ -171,21 +201,30 @@ fn dialogs() -> Vec<(&'static str, serde_json::Value)> {
     ]
 }
 
-/// Every dialog fits the window's minimum width, with the workbook filled.
+/// Every dialog fits the window's minimum size, with the workbook filled. One dialog's failure is
+/// reported with the rest instead of hiding them: the whole list comes out of one run.
 #[test]
 fn every_dialog_fits_the_narrow_window() {
+    let mut problems = Vec::new();
     for (name, params) in dialogs() {
-        let mut h = harness_at(filled_session(), MIN_WIDTH);
-        let chart = h.state().session.active().and_then(|d| d.wb.active().and_then(|s| s.charts.first().map(|c| c.id)));
-        let mut params = params;
-        if let (Some(id), Some(object)) = (chart, params.as_object_mut()) {
-            object.insert("chart".into(), json!(id));
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut h = harness_at(filled_session(), MIN_WIDTH);
+            let chart = h.state().session.active().and_then(|d| d.wb.active().and_then(|s| s.charts.first().map(|c| c.id)));
+            let mut params = params;
+            if let (Some(id), Some(object)) = (chart, params.as_object_mut()) {
+                object.insert("chart".into(), json!(id));
+            }
+            h.state_mut().open_dialog(name, params);
+            h.run_steps(4);
+            assert_eq!(h.state().dialog.as_ref().map(|d| d.name.as_str()), Some(name), "{name} did not open");
+            assert!(assert_windows_inside(&h, name, MIN_WIDTH) >= 1, "{name} draws no window");
+        }));
+        if let Err(panic) = outcome {
+            let message = panic.downcast_ref::<String>().map(String::as_str).or(panic.downcast_ref::<&str>().copied()).unwrap_or("?");
+            problems.push(format!("{name}: {message}"));
         }
-        h.state_mut().open_dialog(name, params);
-        h.run_steps(4);
-        assert_eq!(h.state().dialog.as_ref().map(|d| d.name.as_str()), Some(name), "{name} did not open");
-        assert!(assert_windows_inside(&h, name, MIN_WIDTH) >= 1, "{name} draws no window");
     }
+    assert!(problems.is_empty(), "{} diálogo(s) fora do padrão:\n{}", problems.len(), problems.join("\n"));
 }
 
 /// The top bar (title, file name and the suite's buttons) fits the minimum width. The ribbon below

@@ -1,4 +1,4 @@
-use super::show::{ok_cancel, take_first_focus};
+use super::show::{DIALOG_OUTSIDE, ok_cancel, scrolling_body, take_first_focus};
 use super::{Dialog, Json, SheetApp, json, vec2};
 
 /// Insert Function: search names (as the formula language spells them) and descriptions, or pick
@@ -76,7 +76,9 @@ pub(super) fn insert_function(app: &mut SheetApp, ui: &mut egui::Ui, d: &mut Dia
     // The category column starts after the widest name shown, so a long name in any formula
     // language or font never runs into it.
     let name_w = rows.iter().map(|(n, _)| ui.painter().layout_no_wrap(n.to_string(), font.clone(), t.text).size().x).fold(0.0_f32, f32::max);
-    egui::ScrollArea::vertical().max_height(260.0).auto_shrink([false, false]).show(ui, |ui| {
+    // The list of functions outgrows a short window: it scrolls, with the search field above and
+    // the buttons below always in view (`padrao-craft.md`, "Guardas").
+    scrolling_body(ui, "functions", DIALOG_OUTSIDE, |ui: &mut egui::Ui| {
         if rows.is_empty() {
             ui.label(egui::RichText::new(language.tr("No functions match.")).italics());
         }
@@ -100,12 +102,12 @@ pub(super) fn insert_function(app: &mut SheetApp, ui: &mut egui::Ui, d: &mut Dia
                 *confirm = true;
             }
         }
+        if let Some(f) = hits.get(d.list_index) {
+            ui.separator();
+            ui.label(egui::RichText::new(crate::formula_locale::signature(&f.name, locale, language).unwrap_or_default()).strong());
+            ui.label(crate::formula_locale::description(&f.name, locale, language).unwrap_or_default());
+        }
     });
-    if let Some(f) = hits.get(d.list_index) {
-        ui.separator();
-        ui.label(egui::RichText::new(crate::formula_locale::signature(&f.name, locale, language).unwrap_or_default()).strong());
-        ui.label(crate::formula_locale::description(&f.name, locale, language).unwrap_or_default());
-    }
     let mut open = true;
     ok_cancel(ui, confirm, &mut open);
     // The function counts as recently used once the formula is entered (the engine notes it).
