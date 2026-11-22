@@ -131,7 +131,7 @@ impl SheetApp {
         self.poll_printing(ctx);
         self.guard_window_close(ctx);
         updates_ui::tick(self, ctx);
-        // Files read asynchronously (web file picker, dropped files).
+        // Files read asynchronously (file picker, dropped files).
         self.poll_async_opens();
         if self.ai.tick(&mut self.session) {
             self.grid.ensure_visible = true;
@@ -166,17 +166,11 @@ impl SheetApp {
     /// a real `ui` pass. Once a capture is issued, its `Screenshot` command's own `wants_paint`
     /// paints the hidden window; after that a full hidden pass every frame only wastes CPU. A
     /// minimized request has no size, so no hidden pass can reach issuance: the restore pass issues
-    /// it instead. Native eframe honours `RequestPaintWhileHidden`; the web runner does not (hidden
-    /// tabs only run `run_logic`), so a hidden web tab queues the work until it is shown again.
-    /// This is a shared eframe web follow-up, not a Local Sheets-local workaround, and the control
-    /// protocol documents the limitation.
+    /// it instead.
     fn request_hidden_paint(&self, ctx: &egui::Context) {
         if !(self.shots.needs_hidden_paint() || self.synthetic_pending || !self.synthetic.is_empty()) {
             return;
         }
-        // The web runner has no `RequestPaintWhileHidden`; sending it there only logs an
-        // unhandled command. A visible tab still gets the repaint below; a hidden tab keeps the
-        // work queued until eframe offers a shared paint-while-hidden path.
         ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaintWhileHidden);
         ctx.request_repaint();
     }

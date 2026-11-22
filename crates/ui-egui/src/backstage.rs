@@ -579,7 +579,7 @@ fn open_page(app: &mut SheetApp, ui: &mut Ui, bs: &mut Backstage, out: &mut Outc
     if square_button(ui, Icon::OpenFolder, lang.tr("Browse…")).clicked() {
         let before = app.session.active().map(|d| d.uid);
         app.open_dialog("open", json!({}));
-        // Desktop pickers return at once; the web picker delivers later (see `SheetApp::logic`).
+        // The picker delivers on a later frame (see `SheetApp::logic`).
         if app.session.active().map(|d| d.uid) != before {
             out.close = true;
         }
