@@ -3347,23 +3347,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "localsheets-web"
-version = "0.2.13"
-dependencies = [
- "eframe",
- "egui",
- "js-sys",
- "localsheets-engine",
- "localsheets-ui-egui",
- "log",
- "rfd",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "localsheets-xlsx"
 version = "0.2.13"
 dependencies = [
