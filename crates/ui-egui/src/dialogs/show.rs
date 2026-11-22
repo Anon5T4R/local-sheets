@@ -563,8 +563,27 @@ pub(super) fn ok_cancel(ui: &mut egui::Ui, confirm: &mut bool, open: &mut bool) 
 }
 
 fn form(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog, confirm: &mut bool, open: &mut bool) {
-    form_fields(app, ui, d);
+    scrolling_body(ui, "form", DIALOG_OUTSIDE, |ui| form_fields(app, ui, d));
     ok_cancel(ui, confirm, open);
+}
+
+/// What a dialog draws outside the scrolling part of its body: the title bar, the frame and the
+/// row of OK and Cancel (with the 8-point gap above it).
+pub(super) const DIALOG_OUTSIDE: f32 = 90.0;
+/// A row of tabs between the title bar and a body that scrolls.
+pub(super) const DIALOG_TABS: f32 = 40.0;
+
+/// Draw the part of a dialog's body that may outgrow the window so that it scrolls, with the
+/// title bar and the buttons below it always in view (`docs/planos/padrao-craft.md`, "Guardas").
+/// `outside` is what the dialog draws outside the body in points (the title bar, the footer, and
+/// the tabs of a dialog that has them). The room comes from the window's height, never from the
+/// dialog's own position: a window is centred on the height it had the frame before, so a budget
+/// measured from the cursor would let it grow past the window.
+pub(super) fn scrolling_body<R>(ui: &mut egui::Ui, id: &str, outside: f32, body: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let room = (ui.ctx().content_rect().height() - outside).max(120.0);
+    // The room the body may take is also the least it may scroll in: an area that starts from what
+    // the frame before left it grows a little every frame, and the window with it.
+    egui::ScrollArea::vertical().id_salt(id).max_height(room).min_scrolled_height(room).auto_shrink([false, true]).show(ui, body).inner
 }
 
 /// Gives keyboard focus to the first text or number field the first time a form is drawn. A

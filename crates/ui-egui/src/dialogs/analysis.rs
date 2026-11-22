@@ -1,5 +1,5 @@
 use super::ref_edit::{RefLabel, SHEET_DELETED, end_pick, home_sheet_deleted, ref_edit};
-use super::show::{build_params, form_fields, ok_cancel};
+use super::show::{DIALOG_OUTSIDE, build_params, form_fields, ok_cancel, scrolling_body};
 use super::{Dialog, Field, Json, Map, SheetApp, json, vec2};
 
 /// Data › What-If Analysis › Goal Seek. OK runs `data.goalSeek` here; Cancel clears `open`, as
@@ -452,196 +452,200 @@ pub(super) fn solver(app: &mut SheetApp, ui: &mut egui::Ui, d: &mut Dialog, conf
         solver_options(ui, d, edit);
         return;
     }
-    ui.horizontal(|ui| {
-        let l = ui.label("Set Objective:");
-        ref_edit(app, ui, d, "objective", RefLabel::By(l.id), 230.0);
-    });
-    let goal = text(d, "goal");
-    ui.horizontal(|ui| {
-        ui.label("To:");
-        for (g, label) in [("max", "Max"), ("min", "Min"), ("value", "Value Of:")] {
-            if ui.radio(goal == g, label).clicked() {
-                d.values.insert("goal".into(), json!(g));
-            }
-        }
-        edit(ui, d, "value", 80.0, "Value Of:");
-    });
-    let l = ui.label("By Changing Variable Cells:");
-    ref_edit(app, ui, d, "variables", RefLabel::By(l.id), 420.0);
-    ui.label("Subject to the Constraints:");
-    let list: Vec<String> = d
-        .values
-        .get("constraints")
-        .and_then(Json::as_array)
-        .map(|a| a.iter().map(|c| c.as_str().map(str::to_string).unwrap_or_else(|| c.to_string())).collect())
-        .unwrap_or_default();
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_min_size(vec2(420.0, 90.0));
-        egui::ScrollArea::vertical().max_height(110.0).show(ui, |ui| {
-            for (i, c) in list.iter().enumerate() {
-                if ui.selectable_label(d.list_index == i, c).clicked() {
-                    d.list_index = i;
+    // The model outgrows a short window: it scrolls, and the buttons below always stay in view
+    // (`padrao-craft.md`, "Guardas").
+    scrolling_body(ui, "solver", DIALOG_OUTSIDE, |ui: &mut egui::Ui| {
+        ui.horizontal(|ui| {
+            let l = ui.label("Set Objective:");
+            ref_edit(app, ui, d, "objective", RefLabel::By(l.id), 230.0);
+        });
+        let goal = text(d, "goal");
+        ui.horizontal(|ui| {
+            ui.label("To:");
+            for (g, label) in [("max", "Max"), ("min", "Min"), ("value", "Value Of:")] {
+                if ui.radio(goal == g, label).clicked() {
+                    d.values.insert("goal".into(), json!(g));
                 }
+            }
+            edit(ui, d, "value", 80.0, "Value Of:");
+        });
+        let l = ui.label("By Changing Variable Cells:");
+        ref_edit(app, ui, d, "variables", RefLabel::By(l.id), 420.0);
+        ui.label("Subject to the Constraints:");
+        let list: Vec<String> = d
+            .values
+            .get("constraints")
+            .and_then(Json::as_array)
+            .map(|a| a.iter().map(|c| c.as_str().map(str::to_string).unwrap_or_else(|| c.to_string())).collect())
+            .unwrap_or_default();
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            ui.set_min_size(vec2(420.0, 90.0));
+            egui::ScrollArea::vertical().max_height(110.0).show(ui, |ui| {
+                for (i, c) in list.iter().enumerate() {
+                    if ui.selectable_label(d.list_index == i, c).clicked() {
+                        d.list_index = i;
+                    }
+                }
+            });
+        });
+        ui.horizontal(|ui| {
+            ref_edit(app, ui, d, "newLhs", RefLabel::Named("Constraint Cell Reference"), 130.0);
+            let op = text(d, "newOp");
+            craft_ui::ComboBox::from_id_salt("solverOp")
+                .selected_text(op.clone())
+                .width(60.0)
+                .show_ui(ui, |ui| {
+                    for o in ["<=", "=", ">=", "int", "bin"] {
+                        if ui.selectable_label(op == o, o).clicked() {
+                            d.values.insert("newOp".into(), json!(o));
+                        }
+                    }
+                })
+                .response
+                .accessible_name(lang.tr("Constraint Operator"));
+            if !matches!(op.as_str(), "int" | "bin") {
+                ref_edit(app, ui, d, "newRhs", RefLabel::Named("Constraint Value"), 130.0);
+            }
+            if ui.button("Add").clicked() {
+                let lhs = text(d, "newLhs");
+                if !lhs.trim().is_empty() {
+                    let rhs = if matches!(op.as_str(), "int" | "bin") { String::new() } else { format!(" {}", text(d, "newRhs").trim()) };
+                    let mut list = list.clone();
+                    list.push(format!("{} {op}{rhs}", lhs.trim()));
+                    d.values.insert("constraints".into(), json!(list));
+                    d.values.insert("newLhs".into(), json!(""));
+                    d.values.insert("newRhs".into(), json!(""));
+                }
+            }
+            if ui.add_enabled(d.list_index < list.len(), egui::Button::new("Delete")).clicked() {
+                let mut list = list.clone();
+                if d.list_index < list.len() {
+                    list.remove(d.list_index);
+                }
+                d.values.insert("constraints".into(), json!(list));
             }
         });
-    });
-    ui.horizontal(|ui| {
-        ref_edit(app, ui, d, "newLhs", RefLabel::Named("Constraint Cell Reference"), 130.0);
-        let op = text(d, "newOp");
-        craft_ui::ComboBox::from_id_salt("solverOp")
-            .selected_text(op.clone())
-            .width(60.0)
-            .show_ui(ui, |ui| {
-                for o in ["<=", "=", ">=", "int", "bin"] {
-                    if ui.selectable_label(op == o, o).clicked() {
-                        d.values.insert("newOp".into(), json!(o));
-                    }
-                }
-            })
-            .response
-            .accessible_name(lang.tr("Constraint Operator"));
-        if !matches!(op.as_str(), "int" | "bin") {
-            ref_edit(app, ui, d, "newRhs", RefLabel::Named("Constraint Value"), 130.0);
+        let mut nonneg = d.values.get("nonNegative").and_then(Json::as_bool).unwrap_or(true);
+        if ui.checkbox(&mut nonneg, "Make Unconstrained Variables Non-Negative").changed() {
+            d.values.insert("nonNegative".into(), json!(nonneg));
         }
-        if ui.button("Add").clicked() {
-            let lhs = text(d, "newLhs");
-            if !lhs.trim().is_empty() {
-                let rhs = if matches!(op.as_str(), "int" | "bin") { String::new() } else { format!(" {}", text(d, "newRhs").trim()) };
-                let mut list = list.clone();
-                list.push(format!("{} {op}{rhs}", lhs.trim()));
-                d.values.insert("constraints".into(), json!(list));
-                d.values.insert("newLhs".into(), json!(""));
-                d.values.insert("newRhs".into(), json!(""));
-            }
-        }
-        if ui.add_enabled(d.list_index < list.len(), egui::Button::new("Delete")).clicked() {
-            let mut list = list.clone();
-            if d.list_index < list.len() {
-                list.remove(d.list_index);
-            }
-            d.values.insert("constraints".into(), json!(list));
-        }
-    });
-    let mut nonneg = d.values.get("nonNegative").and_then(Json::as_bool).unwrap_or(true);
-    if ui.checkbox(&mut nonneg, "Make Unconstrained Variables Non-Negative").changed() {
-        d.values.insert("nonNegative".into(), json!(nonneg));
-    }
-    let method = text(d, "method");
-    ui.horizontal(|ui| {
-        ui.label("Select a Solving Method:");
-        let label = |m: &str| match m {
-            "simplex" => "Simplex LP",
-            "evolutionary" => "Evolutionary",
-            _ => "GRG Nonlinear",
-        };
-        craft_ui::ComboBox::from_id_salt("solverMethod")
-            .selected_text(label(&method))
-            .show_ui(ui, |ui| {
-                for m in ["grg", "simplex", "evolutionary"] {
-                    if ui.selectable_label(method == m, label(m)).clicked() {
-                        d.values.insert("method".into(), json!(m));
-                    }
-                }
-            })
-            .response
-            .accessible_name(lang.tr("Select a Solving Method:"));
-    });
-    ui.label(
-        egui::RichText::new(match method.as_str() {
-            "simplex" => "Simplex LP: for linear models; integer and binary constraints by branch and bound.",
-            "evolutionary" => "Evolutionary: a genetic search for models that aren't smooth; every variable cell needs bounds.",
-            _ => "GRG Nonlinear: a local optimum of a smooth model, from the current values.",
-        })
-        .small(),
-    );
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        if ui.button("Reset All").clicked() && at_home(app, d) {
-            match app.run("data.solverReset", json!({})) {
-                Ok(_) => {
-                    for (k, v) in [
-                        ("objective", json!("")),
-                        ("goal", json!("max")),
-                        ("value", json!("0")),
-                        ("variables", json!("")),
-                        ("constraints", json!([])),
-                        ("nonNegative", json!(true)),
-                        ("method", json!("grg")),
-                    ] {
-                        d.values.insert(k.into(), v);
-                    }
-                    // The options go back to their defaults too.
-                    clear_solver_options(d);
-                    for key in ["optionsBackup", "modelNote", "askModelOverwrite"] {
-                        d.values.remove(key);
-                    }
-                }
-                Err(e) => {
-                    d.values.insert("modelNote".into(), json!(crate::clean_error(&e)));
-                }
-            }
-        }
-        let shown = d.values.get("modelArea").and_then(Json::as_bool).unwrap_or(false);
-        // Hiding the area ends picking into Model Range, as a box that is not drawn is no longer
-        // picked into (`ref_edit::window_shown`).
-        if ui.selectable_label(shown, "Load/Save").clicked() {
-            d.values.insert("modelArea".into(), json!(!shown));
-        }
-        if ui.button("Options").clicked() {
-            open_solver_options(d);
-        }
-    });
-    if d.values.get("modelArea").and_then(Json::as_bool) == Some(true) {
+        let method = text(d, "method");
         ui.horizontal(|ui| {
-            let l = ui.label("Model Range:");
-            ref_edit(app, ui, d, "modelRange", RefLabel::By(l.id), 170.0);
-            let range = text(d, "modelRange");
-            let ready = !range.trim().is_empty();
-            if ui.add_enabled(ready, egui::Button::new("Load")).clicked() && at_home(app, d) {
-                d.values.remove("askModelOverwrite");
-                match app.run("data.solverLoadModel", json!({"from": range.trim()})) {
-                    Ok(r) => {
-                        if let Some(m) = r.get("model").and_then(Json::as_object) {
-                            // The loaded model's options only: one it omits takes its default.
-                            clear_solver_options(d);
-                            for (k, x) in m {
-                                d.values.insert(k.clone(), if k == "value" { json!(x.to_string()) } else { x.clone() });
-                            }
+            ui.label("Select a Solving Method:");
+            let label = |m: &str| match m {
+                "simplex" => "Simplex LP",
+                "evolutionary" => "Evolutionary",
+                _ => "GRG Nonlinear",
+            };
+            craft_ui::ComboBox::from_id_salt("solverMethod")
+                .selected_text(label(&method))
+                .show_ui(ui, |ui| {
+                    for m in ["grg", "simplex", "evolutionary"] {
+                        if ui.selectable_label(method == m, label(m)).clicked() {
+                            d.values.insert("method".into(), json!(m));
                         }
-                        d.values.insert("modelNote".into(), json!("The model was loaded."));
+                    }
+                })
+                .response
+                .accessible_name(lang.tr("Select a Solving Method:"));
+        });
+        ui.label(
+            egui::RichText::new(match method.as_str() {
+                "simplex" => "Simplex LP: for linear models; integer and binary constraints by branch and bound.",
+                "evolutionary" => "Evolutionary: a genetic search for models that aren't smooth; every variable cell needs bounds.",
+                _ => "GRG Nonlinear: a local optimum of a smooth model, from the current values.",
+            })
+            .small(),
+        );
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if ui.button("Reset All").clicked() && at_home(app, d) {
+                match app.run("data.solverReset", json!({})) {
+                    Ok(_) => {
+                        for (k, v) in [
+                            ("objective", json!("")),
+                            ("goal", json!("max")),
+                            ("value", json!("0")),
+                            ("variables", json!("")),
+                            ("constraints", json!([])),
+                            ("nonNegative", json!(true)),
+                            ("method", json!("grg")),
+                        ] {
+                            d.values.insert(k.into(), v);
+                        }
+                        // The options go back to their defaults too.
+                        clear_solver_options(d);
+                        for key in ["optionsBackup", "modelNote", "askModelOverwrite"] {
+                            d.values.remove(key);
+                        }
                     }
                     Err(e) => {
                         d.values.insert("modelNote".into(), json!(crate::clean_error(&e)));
                     }
                 }
             }
-            if ui.add_enabled(ready, egui::Button::new("Save")).clicked() && at_home(app, d) {
-                save_solver_model(app, d, &range, false);
+            let shown = d.values.get("modelArea").and_then(Json::as_bool).unwrap_or(false);
+            // Hiding the area ends picking into Model Range, as a box that is not drawn is no longer
+            // picked into (`ref_edit::window_shown`).
+            if ui.selectable_label(shown, "Load/Save").clicked() {
+                d.values.insert("modelArea".into(), json!(!shown));
+            }
+            if ui.button("Options").clicked() {
+                open_solver_options(d);
             }
         });
-        // Save Model asks before it replaces data in the model range; the question goes when
-        // the range is edited, so Replace writes only where it asked about.
-        let asked = d.values.get("askModelOverwrite").and_then(Json::as_str).map(str::to_string);
-        if asked.as_deref().is_some_and(|a| a != text(d, "modelRange").trim()) {
-            d.values.remove("askModelOverwrite");
-            d.values.remove("modelNote");
-        } else if let Some(asked) = asked {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(format!("{asked} already holds data. Replace it with the model?"));
-                if ui.button("Replace").clicked() && at_home(app, d) {
-                    save_solver_model(app, d, &asked, true);
-                }
-                if ui.button("Don't Replace").clicked() {
+        if d.values.get("modelArea").and_then(Json::as_bool) == Some(true) {
+            ui.horizontal(|ui| {
+                let l = ui.label("Model Range:");
+                ref_edit(app, ui, d, "modelRange", RefLabel::By(l.id), 170.0);
+                let range = text(d, "modelRange");
+                let ready = !range.trim().is_empty();
+                if ui.add_enabled(ready, egui::Button::new("Load")).clicked() && at_home(app, d) {
                     d.values.remove("askModelOverwrite");
-                    d.values.remove("modelNote");
+                    match app.run("data.solverLoadModel", json!({"from": range.trim()})) {
+                        Ok(r) => {
+                            if let Some(m) = r.get("model").and_then(Json::as_object) {
+                                // The loaded model's options only: one it omits takes its default.
+                                clear_solver_options(d);
+                                for (k, x) in m {
+                                    d.values.insert(k.clone(), if k == "value" { json!(x.to_string()) } else { x.clone() });
+                                }
+                            }
+                            d.values.insert("modelNote".into(), json!("The model was loaded."));
+                        }
+                        Err(e) => {
+                            d.values.insert("modelNote".into(), json!(crate::clean_error(&e)));
+                        }
+                    }
+                }
+                if ui.add_enabled(ready, egui::Button::new("Save")).clicked() && at_home(app, d) {
+                    save_solver_model(app, d, &range, false);
                 }
             });
+            // Save Model asks before it replaces data in the model range; the question goes when
+            // the range is edited, so Replace writes only where it asked about.
+            let asked = d.values.get("askModelOverwrite").and_then(Json::as_str).map(str::to_string);
+            if asked.as_deref().is_some_and(|a| a != text(d, "modelRange").trim()) {
+                d.values.remove("askModelOverwrite");
+                d.values.remove("modelNote");
+            } else if let Some(asked) = asked {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(format!("{asked} already holds data. Replace it with the model?"));
+                    if ui.button("Replace").clicked() && at_home(app, d) {
+                        save_solver_model(app, d, &asked, true);
+                    }
+                    if ui.button("Don't Replace").clicked() {
+                        d.values.remove("askModelOverwrite");
+                        d.values.remove("modelNote");
+                    }
+                });
+            }
         }
-    }
-    let note = text(d, "modelNote");
-    if !note.is_empty() {
-        ui.label(egui::RichText::new(note).small());
-    }
+        let note = text(d, "modelNote");
+        if !note.is_empty() {
+            ui.label(egui::RichText::new(note).small());
+        }
+    });
     ui.add_space(8.0);
     // A row as tall as the buttons (see `ok_cancel`): the Load/Save area and the notes can make
     // the form shorter, and a right-to-left layout straight in the window would fill what is
