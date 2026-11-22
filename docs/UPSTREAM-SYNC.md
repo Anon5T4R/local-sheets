@@ -1,81 +1,57 @@
 # Sincronização com o upstream (storytold/gridcraft)
 
-## Objetivo
-Manter o `local-sheets` próximo do `storytold/gridcraft` sem perder a independência do rebranding:
-nenhum merge cego, nenhuma dependência de servidor da org deles, nenhum `git+` no lock. Tudo que
-entrar no main deste repo passa por revisão primeiro.
+Porta/rebrand da suíte Local: o `main` é nosso, o upstream é fonte de mudanças candidatas e nada
+entra sem revisão. Regras gerais em `docs/planos/licoes-de-porta.md` (dev-notes).
 
-**Baseline:** gridcraft `v0.16.1` = `e581bc95` (o commit importado na Fase A). XLSX continua sendo o
-formato nativo — o fork não introduz formato próprio, então arquivos e ferramentas do upstream
-seguem compatíveis.
+## Base
 
-## Princípios
-1. **O main é nosso.** O upstream é uma fonte de mudanças candidatas, nunca um destino automático.
-2. **Revisão humana obrigatória.** Nada entra no `main` sem passar pela revisão de arquitetura.
-3. **Mapeamento de renames é explícito.** Todo caminho que difere fica em `docs/UPSTREAM-MAP.toml`.
-4. **Puxamos apenas o que é nosso.** Não puxamos branding, `docs/brand/`, links `getartcraft.com`,
-   Discord, CI da org `storytold`, nem o packaging deles.
-5. **Contribuímos de volta.** Bug compartilhado vira Issue/PR no `storytold/gridcraft` (em inglês),
-   registrado em `docs/UPSTREAM-CONTRIBUTIONS.md` se/quando existir.
-6. **Independência de conteúdo.** Feature que baixa conteúdo do servidor deles não entra como está:
-   ou o conteúdo é embutido/`assets/`, ou o fetch tem checksum fixo, ou a feature fica de fora.
-7. **Vendoring por rev.** `libs/craft-libs` fica no rev `c5a1cbf` (com a árvore `vendor/`);
-   `libs/egui` `6d518fc`; `libs/winit` `a517b38`; `libs/winprint.rs` `417ac3c`. Um sync que precise
-   de outro rev de craft-libs é decisão própria (lição §43: árvore no rev da maioria + crates
-   pinados sobrepostos).
-8. **Política de fontes é nossa.** `crates/ui-egui/src/craft_fonts_policy.rs` barra Adobe, Source
-   Han/Sans/Serif e Noto CJK do craft-fonts mesmo que o upstream os embuta.
+- Upstream: `storytold/gridcraft`, tag **v0.16.1** = commit **e581bc95** (`Release 0.16.1`,
+  2026-11-04). A árvore foi copiada sem histórico no primeiro commit da porta (`4032f89`, fases A+B).
+- Conferido no sync de 2026-11-21: a árvore importada não é exatamente o diff de `e581bc95` — dois
+  commits do `main` de 03/nov já vinham nela (`065f05db` MODE por índice/FREQUENCY por busca binária
+  e `db05400e` cada dependente listado uma vez), com código e teste. Eles não são reaplicáveis; a
+  base para os próximos syncs continua `e581bc95`.
+- Fork: `Anon5T4R/local-sheets`, versão própria na linha `0.2.x` (numeração nova evita auto-update
+  falso para o upstream).
+- Nada é lido de `C:\Dev\storytold` em build, teste ou release; a pasta é só referência local para
+  a skill `sync-upstream`.
+- `docs/UPSTREAM-MAP.toml` registra os caminhos que diferem, o que pode ser aplicado por script e o
+  que exige revisão.
 
-## O que puxar vs o que não puxar
+## Vendorizado (fora do sync normal)
 
-| Categoria | Puxar? | Motivo / exemplo |
-|-----------|--------|------------------|
-| Correção de segurança (parser XLSX, XLSB, ODS, ZIP) | ✅ Sim | `crates/xlsx/`, `crates/engine/src/io.rs` |
-| Correção de corrupção / perda de dados | ✅ Sim | `crates/xlsx/`, `crates/engine/src/io.rs` |
-| Crash / travamento | ✅ Sim | engine, UI, calc |
-| Performance crítica (recálculo, grade virtual) | ✅ Sim | `crates/calc/`, `crates/ui-egui/src/grid*` |
-| Bug de paridade com Excel (fórmula, formato numérico) | ✅ Sim | `crates/formula/`, `crates/functions/`, `crates/numfmt/` |
-| Feature de UI / ribbon específica | ⚠️ Caso a caso | avaliar com o rebrand |
-| Mudança de nomes / bundle id / marca | ❌ Não | é nosso rebrand; conflito garantido |
-| Dependências novas / atualizações | ⚠️ Caso a caso | só via `local-deps/WORKFLOW.md` |
-| CI / workflows da org storytold | ❌ Não | nosso CI é próprio (`.github/workflows/`) |
-| Packaging | ❌ Não | `packaging/` é do molde da suíte |
+| Caminho | Origem | Rev |
+|---|---|---|
+| `libs/craft-libs` | `storytold/craft-libs` | `c5a1cbf` (com `vendor/`) |
+| `libs/craft-libs/crates/update` | **`Anon5T4R/local-libs`** (fonte única da suíte) | conferido pelo `scripts/check-mirror.sh` |
+| `libs/egui` | `storytold/egui` | `6d518fc` |
+| `libs/winit` | `storytold/winit` | `a517b38` |
+| `libs/winprint.rs` | `storytold/winprint.rs` | `417ac3c` |
 
-## Fluxo de sincronização
-1. `git remote add upstream https://github.com/storytold/gridcraft.git` (uma vez) e `git fetch upstream`.
-2. `git checkout -b sync/upstream-<YYYYMMDD>` (nunca direto no `main`).
-3. Listar os commits novos desde `e581bc95` (ou o último sync registrado) e aplicar por arquivo,
-   conforme `docs/UPSTREAM-MAP.toml`.
-4. Testar: `cargo build --locked`, `cargo test --locked --no-fail-fast -- --test-threads=1`,
-   `cargo clippy --locked --all-targets -- -D warnings`, `cargo xtask ci`.
-5. Revisão de arquitetura; merge no `main` só se tudo verde.
-6. Registrar aqui: data, faixa de commits, o que entrou, o que ficou de fora e por quê.
+`craft-update` é **fork permanente consciente** e fica fora do sync: bugfix vai direto na fonte
+(`local-libs`) e é replicado com `sync.ps1 -Mode push` (guarda de hash; a cópia aqui é espelho).
+Nunca edite `libs/craft-libs/crates/update` à mão.
 
-## Automação
-Pode: `git fetch`, listar commits, tentar `git apply` nos arquivos `strategy = "apply"`, rodar os
-gates nos crates afetados, gerar relatório.
-Não pode: resolver `Cargo.toml`, `packaging/`, `.github/`; adicionar/atualizar dependência; decidir
-se uma feature entra; fazer merge; abrir PR no upstream.
+## Divergências do rebrand (o que é nosso)
 
-## Registro de syncs
+- Identidade: crates `localsheets-*`, binários `localsheets`/`localsheets-cli`, app id, ProgIds e
+  UpgradeCode do MSI, chaves de registro e pasta de configuração próprios.
+- XLSX continua o formato nativo — o fork não introduz formato próprio, então arquivos e ferramentas
+  do upstream seguem compatíveis.
+- CI próprio: sem workflows da org `storytold`; release por tag `vX.Y.Z` no Actions.
+- Packaging no molde da suíte (MSI per-machine e per-user, AppImage/deb/rpm/tar, PKGBUILD).
+- Fontes do `craft-fonts` passam pelo filtro de asset policy (`crates/ui-egui/src/craft_fonts_policy.rs`).
+- Aba IA (BYOK) é nossa: `libs/local-ai` vendored + crate `localsheets-ai`, chave no keychain do SO.
+- MCP/CLI: servidor `crates/mcp` (stdio + backends headless/`Remote`) e a crate compartilhada
+  `craft-mcp` no `--connect`.
 
-| Data | Upstream | O que entrou | O que ficou de fora |
-|------|----------|--------------|---------------------|
-| 2026-11-05 | `e581bc95` (v0.16.1) | baseline: árvore inteira importada (Fase A) | `.github/`, `sonar-project.properties`, `.coderabbit.yaml`, `docs/brand/`, packaging de cada SO reescrito no molde da suíte, branding nos README/NOTICE/ATTRIBUTION |
+## Registro de sync
 
-## Decision Ledger
+A base continua `e581bc95`: só pontos escolhidos entram (skill `sync-upstream`), não um bump.
 
-| Data | Decisão | Justificativa |
-|------|---------|---------------|
-| 2026-11-05 | Sync é manual-revisado, nunca automático no main | Protege o rebrand de regressões silenciosas |
-| 2026-11-05 | XLSX continua o formato nativo, sem formato próprio | Compatibilidade com arquivos e ferramentas do upstream e do Excel |
-| 2026-11-05 | `docs/UPSTREAM-MAP.toml` é o contrato do que pode ser aplicado por script | Evita que nomes de crate/bundle id do upstream entrem no repo |
-| 2026-11-05 | Packaging e CI não vêm do upstream | O molde da suíte (WiX per-machine/per-user, workflows próprios) é a referência |
-| 2026-11-05 | Fontes do craft-fonts passam pelo filtro de asset policy | O repo é clean-room: nada de Adobe/Source/Noto CJK embutido |
-| 2026-11-16 | Aba IA (BYOK) própria: `libs/local-ai` vendored + crate `localsheets-ai` | Feature nossa, sem equivalente no upstream. A chave fica no keychain do SO (nunca em arquivo), o contrato JSON passa pelo extrator tolerante e cada ação é aplicada por comandos do engine dentro de um único grupo de undo |
+| Data | Alvo (gridcraft) | Pegos | Descartados relevantes |
+|---|---|---|---|
+| 2026-11-21 | `origin/main` de 2026-11-21 (`11a5711a`); commits de 2026-11-03 a 2026-11-11 | `aa4951fd` → `304690e` (WORKDAY, PIVOTBY, SORT e as funções D param de reescanear a entrada); `bbe08254` → `f8ca170` (TEXTJOIN monta o resultado dentro do limite de texto); `7cb00883`+`9ab297ce` → `47045bf` (edição estrutural reescreve só as fórmulas que muda, com os oráculos `adjust_oracle` e `structural_edit_rewrite`); `35e98156` → `d6f0f32` (um orçamento de trabalho só para todas as chamadas de uma função elevada); `67a0b7f3`+`bc162524` → `293e380` (rasterização, splines e rótulos de categoria com teto) | `065f05db` e `db05400e` já estavam na base; de `bc162524`, o caminho rápido `needs_sanitizing` (sempre sanitizamos e os níveis já têm teto), o remendo de `BarRun` (não temos a fusão de barras) e o da média móvel (somamos a janela direto, sem somas de bloco) |
 
-## craft-update vendored: fork permanente da suíte (fora do sync)
-
-`libs/craft-libs/crates/update` está **fora do escopo** deste sync com o upstream. É um crate nosso, hospedado no `craft-libs` da suíte Local, e um **fork permanente consciente** do `craft-update` upstream — unificado nos 10 apps em 2026-11-13, com um diff de milhares de linhas contra `storytold/craft-libs/crates/update` (MSI context/migrate, pins do launcher, `offers_update`, `desktop_register`, catálogo único de apps). Nenhum diff de sync encaixa nele.
-
-Bugfix e feature vão **direto na fonte única** — repo `Anon5T4R/local-libs` (crate `crates/update`) — e daí são replicados para os apps pelo script de sincronização (`sync.ps1 -Mode push`, guarda de hash ×10; a cópia vendored aqui é espelho). Nunca edite a cópia local diretamente: o próximo sync sobrescreve. Contribuições ao upstream só via **Issue/PR manual**, em inglês, quando o problema também existir lá - mesma política do `UPSTREAM-CONTRIBUTIONS.md` do local-office. O restante do `craft-libs` segue o fluxo normal deste documento.
+Nenhum item pediu crate ou API que não temos; o único pré-requisito foi `Formula::with_expr` (do
+`b6bbdcd5`, que não temos), trazido junto no commit do item 3.
