@@ -99,7 +99,6 @@ LaTeX subset:
   the deepest accepted input needs under 256 KB of stack in a release build, well inside the
   smallest main-thread stack we run on (1 MB on Windows). Absurd sizes (`\rule{1e308em}{1em}`)
   lay out with huge dimensions, so the wrapper caps them.
-- **wasm.** The crates build for `wasm32-unknown-unknown`.
 - **Regular expressions.** `ratex-parser` pulls in `fancy-regex` (with `bit-set` 0.8 and a
   second `bit-vec`) for one module, its port of mhchem: 62 anchored patterns in
   `src/mhchem/data/patterns_regex.json` and a dozen in `src/mhchem/patterns.rs` tokenise the
@@ -119,8 +118,7 @@ LaTeX subset:
 Because a stray panic is still possible, RaTeX runs only inside `localsheets-math`, under
 `catch_unwind`, with input capped at 4 KB and depth 32. Its output is converted to plain data and
 cached on the shape; painting (egui and PDF) reads only that cache, so nothing in a paint path
-can reach RaTeX. On the web build (`wasm32-unknown-unknown`) a panic aborts instead of unwinding,
-so there the caps and the fuzzed input space are the protection. `crates/math/tests/gate.rs` re-runs a smaller, deterministic version of the
+can reach RaTeX. `crates/math/tests/gate.rs` re-runs a smaller, deterministic version of the
 gate on every test run, so a version bump has to pass it. RaTeX positions glyphs with KaTeX
 font metrics; Local Sheets never bundles the KaTeX fonts, so glyphs are drawn with system fonts
 and a glyph no font has is drawn as a `[?]` box.

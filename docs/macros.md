@@ -61,8 +61,7 @@ This page describes the engine, its commands and the macro interface in the wind
   more rows or columns than its `max` is refused, and a run executes at most 100,000 steps (each
   pass through a Repeat counts), passes its commands at most 256 MB of parameters, all steps
   together, and takes at most 60 seconds, all three shared by the footprint dry runs and the run
-  itself (`timeLimit` to change the time; the web build has no clock, so there only the step and
-  parameter limits apply). The debugger gives each of its actions the time limit on its own.
+  itself (`timeLimit` to change the time). The debugger gives each of its actions the time limit on its own.
 
 ## Tokens
 

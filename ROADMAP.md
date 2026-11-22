@@ -1,6 +1,6 @@
 # ROADMAP — Local Sheets
 
-Fork do gridcraft (gridcraft v0.16.1), rebrandado para a suíte Local. Rust puro + egui, desktop e web.
+Fork do gridcraft (gridcraft v0.16.1), rebrandado para a suíte Local. Rust puro + egui, desktop.
 **XLSX é o formato nativo** — o fork não inventa formato próprio, então arquivos e ferramentas do
 upstream e do Excel seguem compatíveis. Como é construído: `docs/architecture.md`; decisões e o porquê:
 `docs/decisions.md`.

@@ -70,25 +70,23 @@ is copied into this repository.
 
 | Families | Licence | Notes |
 |---|---|---|
-| BIZ UDPGothic Regular, BIZ UDPGothic Bold | OFL-1.1 | Japanese text (required face; in the web bundle) |
-| NanumGothic Regular | OFL-1.1 | Korean text (required face; in the web bundle) |
-| Noto Sans Symbols Regular | OFL-1.1 | Interface symbol fallback (required face; in the web bundle) |
-| Noto Sans Symbols 2 Regular | OFL-1.1 | Interface symbol fallback (required face; in the web bundle) |
-| The other Latin and script faces listed in craft-fonts' `fonts/manifest.txt` (for example Inter, Carlito, Caladea, Liberation, DejaVu, Roboto, Noto Sans, Noto Sans Arabic, Noto Sans Hebrew, Noto Sans Thai, Noto Sans Georgian, Shippori Mincho, BIZ UDMincho) | OFL-1.1 (per-file in craft-fonts) | Document and interface text; embedded natively only |
+| BIZ UDPGothic Regular, BIZ UDPGothic Bold | OFL-1.1 | Japanese text (required face) |
+| NanumGothic Regular | OFL-1.1 | Korean text (required face) |
+| Noto Sans Symbols Regular | OFL-1.1 | Interface symbol fallback (required face) |
+| Noto Sans Symbols 2 Regular | OFL-1.1 | Interface symbol fallback (required face) |
+| The other Latin and script faces listed in craft-fonts' `fonts/manifest.txt` (for example Inter, Carlito, Caladea, Liberation, DejaVu, Roboto, Noto Sans, Noto Sans Arabic, Noto Sans Hebrew, Noto Sans Thai, Noto Sans Georgian, Shippori Mincho, BIZ UDMincho) | OFL-1.1 (per-file in craft-fonts) | Document and interface text; embedded |
 
 The Adobe, Source Han/Source Sans/Source Serif and Noto Sans/Serif CJK families in craft-fonts are
-never embedded: the asset policy bars their prefixes. The web (wasm32) build embeds only the four
-required faces above.
+never embedded: the asset policy bars their prefixes.
 
-### Optional native Chinese fallback
+### Optional Chinese fallback
 
-Native builds also read craft-fonts' `fonts/simplified-chinese-manifest.txt` when present. This
-opt-in never enters the wasm font allowlist, and is only required when the build sets
-`CRAFT_FONTS_REQUIRED=1`.
+The build also reads craft-fonts' `fonts/simplified-chinese-manifest.txt` when present. This
+opt-in is only required when the build sets `CRAFT_FONTS_REQUIRED=1`.
 
 | Family | Author | Source | Licence | Used for |
 |---|---|---|---|---|
-| LXGW WenKai Lite Regular | LXGW; original Klee Project Authors / Fontworks | https://github.com/lxgw/LxgwWenKai-Lite | OFL-1.1, with the LXGW Reserved Font Names | Native Simplified Chinese glyph fallback after the interface faces; font bytes and the full licence stay in craft-fonts |
+| LXGW WenKai Lite Regular | LXGW; original Klee Project Authors / Fontworks | https://github.com/lxgw/LxgwWenKai-Lite | OFL-1.1, with the LXGW Reserved Font Names | Simplified Chinese glyph fallback after the interface faces; font bytes and the full licence stay in craft-fonts |
 
 ## Metrics and tables typed in from public sources
 

@@ -95,9 +95,9 @@ note = "CLI renomeada e com links próprios"
 
 [[map]]
 upstream = "apps/gridcraft-web/**"
-local = "apps/localsheets-web/**"
+local = ""
 strategy = "skip"
-note = "wasm renomeado"
+note = "a suíte não tem versão web (decisão de 2026-11-21)"
 
 [[map]]
 upstream = "packaging/**"
