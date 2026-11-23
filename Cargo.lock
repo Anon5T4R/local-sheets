@@ -3221,7 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "arboard",
  "chrono",
@@ -3249,7 +3249,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-ai"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "local-ai",
  "localsheets-functions",
@@ -3259,7 +3259,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-calc"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-core",
  "localsheets-formula",
@@ -3271,7 +3271,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-chart"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-calc",
  "localsheets-core",
@@ -3282,7 +3282,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-cli"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "craft-mcp",
  "localsheets-engine",
@@ -3295,7 +3295,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-core"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "chrono",
  "serde",
@@ -3305,7 +3305,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-engine"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "image",
  "localsheets-calc",
@@ -3327,7 +3327,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-formula"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-core",
  "serde",
@@ -3336,7 +3336,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-functions"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-core",
  "regex",
@@ -3344,7 +3344,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-math"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "ratex-font",
  "ratex-layout",
@@ -3354,7 +3354,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-mcp"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-engine",
  "log",
@@ -3363,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-model"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-core",
  "localsheets-formula",
@@ -3376,18 +3376,18 @@ dependencies = [
 
 [[package]]
 name = "localsheets-numfmt"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-core",
 ]
 
 [[package]]
 name = "localsheets-pdf"
-version = "0.2.15"
+version = "0.2.16"
 
 [[package]]
 name = "localsheets-ui-egui"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "craft-ai-ui",
  "craft-icons",
@@ -3414,7 +3414,7 @@ dependencies = [
 
 [[package]]
 name = "localsheets-xlsx"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "aes 0.9.3",
  "localsheets-core",
@@ -7619,7 +7619,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "localsheets-engine",
  "serde_json",
