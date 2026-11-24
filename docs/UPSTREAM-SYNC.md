@@ -28,6 +28,10 @@ entra sem revisão. Regras gerais em `docs/planos/licoes-de-porta.md` (dev-notes
 | `libs/winit` | `storytold/winit` | `a517b38` |
 | `libs/winprint.rs` | `storytold/winprint.rs` | `417ac3c` |
 
+`6758393` do `winprint.rs` (build-dependencies do download do PDFium opcionais atrás da feature `pdfium`, com o código do
+`build.rs` num módulo sob a mesma feature) entrou à parte do rev acima. O app usa o `winprint` com
+`default-features = false`; `reqwest`, `sigstore-*` e `aws-lc-sys` deixaram de ser compilados.
+
 `craft-update` é **fork permanente consciente** e fica fora do sync: bugfix vai direto na fonte
 (`local-libs`) e é replicado com `sync.ps1 -Mode push` (guarda de hash; a cópia aqui é espelho).
 Nunca edite `libs/craft-libs/crates/update` à mão.
