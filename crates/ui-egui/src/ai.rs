@@ -1465,7 +1465,7 @@ mod tests {
     }
 
     /// The real-model end-to-end: network + key, so `#[ignore]`. Run by hand (the key comes from
-    /// `OPENROUTER_API_KEY` or from `C:\Users\Hades\Desktop\ai-test.env`; a free model works with a
+    /// `OPENROUTER_API_KEY` or from `C:\Users\Hades\Segredos\ai-test.env`; a free model works with a
     /// zero-credit key):
     /// `AI_TEST_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free cargo test -p localsheets-ui-egui ai::tests::a_real_model -- --ignored --nocapture`
     #[test]
@@ -1529,15 +1529,15 @@ mod tests {
     }
 
     /// The key the ignored real-model test uses: the environment first, then the suite's
-    /// `ai-test.env` on the Desktop (never printed).
+    /// `ai-test.env` in `C:\Users\Hades\Segredos` (never printed).
     fn real_key() -> String {
         if let Ok(key) = std::env::var("OPENROUTER_API_KEY")
             && !key.trim().is_empty()
         {
             return key;
         }
-        let path = std::path::Path::new(r"C:\Users\Hades\Desktop\ai-test.env");
-        let text = std::fs::read_to_string(path).expect("ai-test.env on the Desktop");
+        let path = std::path::Path::new(r"C:\Users\Hades\Segredos\ai-test.env");
+        let text = std::fs::read_to_string(path).expect("ai-test.env in the Segredos folder");
         text.lines()
             .filter_map(|line| line.split_once('='))
             .find(|(name, _)| name.trim() == "OPENROUTER_API_KEY")
