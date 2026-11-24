@@ -1,61 +1,60 @@
-# Sincronização com o upstream (storytold/gridcraft)
+# Upstream sync (storytold/gridcraft)
 
-Porta/rebrand da suíte Local: o `main` é nosso, o upstream é fonte de mudanças candidatas e nada
-entra sem revisão. Regras gerais em `docs/planos/licoes-de-porta.md` (dev-notes).
+The Local suite's port/rebrand: `main` is ours, the upstream is a source of candidate changes and
+nothing enters without review. General rules in `docs/planos/licoes-de-porta.md` (dev-notes).
 
 ## Base
 
 - Upstream: `storytold/gridcraft`, tag **v0.16.1** = commit **e581bc95** (`Release 0.16.1`,
-  2026-11-04). A árvore foi copiada sem histórico no primeiro commit da porta (`4032f89`, fases A+B).
-- Conferido no sync de 2026-11-21: a árvore importada não é exatamente o diff de `e581bc95` — dois
-  commits do `main` de 03/nov já vinham nela (`065f05db` MODE por índice/FREQUENCY por busca binária
-  e `db05400e` cada dependente listado uma vez), com código e teste. Eles não são reaplicáveis; a
-  base para os próximos syncs continua `e581bc95`.
-- Fork: `Styx-Studios/Local-Sheets`, versão própria na linha `0.2.x` (numeração nova evita auto-update
-  falso para o upstream).
-- Nada é lido de `C:\Dev\storytold` em build, teste ou release; a pasta é só referência local para
-  a skill `sync-upstream`.
-- `docs/UPSTREAM-MAP.toml` registra os caminhos que diferem, o que pode ser aplicado por script e o
-  que exige revisão.
+  2026-11-04). The tree was copied without history in the port's first commit (`4032f89`, phases
+  A+B).
+- Checked in the 2026-11-21 sync: the imported tree is not exactly the diff of `e581bc95` — two
+  commits from the `main` of Nov 3 already came in it (`065f05db` MODE by index/FREQUENCY by binary
+  search and `db05400e` each dependent listed once), with code and tests. They are not reappliable;
+  the base for the next syncs stays `e581bc95`.
+- Fork: `Styx-Studios/Local-Sheets`, own version on the `0.2.x` line (a new numbering avoids a false
+  auto-update to the upstream).
+- Nothing is read from `C:\Dev\storytold` in build, test or release; the folder is only a local
+  reference for the `sync-upstream` skill.
+- `docs/UPSTREAM-MAP.toml` records the paths that differ, what can be applied by script and what
+  requires review.
 
-## Vendorizado (fora do sync normal)
+## Vendored (outside the normal sync)
 
-| Caminho | Origem | Rev |
+| Path | Origin | Rev |
 |---|---|---|
-| `libs/craft-libs` | `storytold/craft-libs` | `c5a1cbf` (com `vendor/`) |
-| `libs/craft-libs/crates/update` | **`Styx-Studios/local-libs`** (fonte única da suíte) | conferido pelo `scripts/check-mirror.sh` |
+| `libs/craft-libs` | `storytold/craft-libs` | `c5a1cbf` (with `vendor/`) |
+| `libs/craft-libs/crates/update` | **`Styx-Studios/local-libs`** (the suite's single source) | checked by `scripts/check-mirror.sh` |
 | `libs/egui` | `storytold/egui` | `6d518fc` |
 | `libs/winit` | `storytold/winit` | `a517b38` |
 | `libs/winprint.rs` | `storytold/winprint.rs` | `417ac3c` |
 
-`6758393` do `winprint.rs` (build-dependencies do download do PDFium opcionais atrás da feature `pdfium`, com o código do
-`build.rs` num módulo sob a mesma feature) entrou à parte do rev acima. O app usa o `winprint` com
-`default-features = false`; `reqwest`, `sigstore-*` e `aws-lc-sys` deixaram de ser compilados.
+`craft-update` is a **conscious permanent fork** and stays outside the sync: bugfixes go straight
+into the source (`local-libs`) and are replicated with `sync.ps1 -Mode push` (hash guard; the copy
+here is a mirror). Never edit `libs/craft-libs/crates/update` by hand.
 
-`craft-update` é **fork permanente consciente** e fica fora do sync: bugfix vai direto na fonte
-(`local-libs`) e é replicado com `sync.ps1 -Mode push` (guarda de hash; a cópia aqui é espelho).
-Nunca edite `libs/craft-libs/crates/update` à mão.
+## Rebrand divergences (what is ours)
 
-## Divergências do rebrand (o que é nosso)
+- Identity: crates `localsheets-*`, binaries `localsheets`/`localsheets-cli`, app id, ProgIds and
+  the MSI's UpgradeCode, registry keys and configuration folder of our own.
+- XLSX stays the native format — the fork introduces no format of its own, so files and tools from
+  the upstream stay compatible.
+- Own CI: no `storytold` org workflows; release by tag `vX.Y.Z` on Actions.
+- Packaging in the suite's mold (per-machine and per-user MSI, AppImage/deb/rpm/tar, PKGBUILD).
+- The `craft-fonts` fonts go through the asset policy filter
+  (`crates/ui-egui/src/craft_fonts_policy.rs`).
+- The AI tab (BYOK) is ours: vendored `libs/local-ai` + crate `localsheets-ai`, key in the OS
+  keychain.
+- MCP/CLI: server `crates/mcp` (stdio + headless/`Remote` backends) and the shared crate
+  `craft-mcp` on `--connect`.
 
-- Identidade: crates `localsheets-*`, binários `localsheets`/`localsheets-cli`, app id, ProgIds e
-  UpgradeCode do MSI, chaves de registro e pasta de configuração próprios.
-- XLSX continua o formato nativo — o fork não introduz formato próprio, então arquivos e ferramentas
-  do upstream seguem compatíveis.
-- CI próprio: sem workflows da org `storytold`; release por tag `vX.Y.Z` no Actions.
-- Packaging no molde da suíte (MSI per-machine e per-user, AppImage/deb/rpm/tar, PKGBUILD).
-- Fontes do `craft-fonts` passam pelo filtro de asset policy (`crates/ui-egui/src/craft_fonts_policy.rs`).
-- Aba IA (BYOK) é nossa: `libs/local-ai` vendored + crate `localsheets-ai`, chave no keychain do SO.
-- MCP/CLI: servidor `crates/mcp` (stdio + backends headless/`Remote`) e a crate compartilhada
-  `craft-mcp` no `--connect`.
+## Sync log
 
-## Registro de sync
+The base stays `e581bc95`: only chosen points enter (skill `sync-upstream`), not a bump.
 
-A base continua `e581bc95`: só pontos escolhidos entram (skill `sync-upstream`), não um bump.
-
-| Data | Alvo (gridcraft) | Pegos | Descartados relevantes |
+| Date | Target (gridcraft) | Taken | Relevant discards |
 |---|---|---|---|
-| 2026-11-21 | `origin/main` de 2026-11-21 (`11a5711a`); commits de 2026-11-03 a 2026-11-11 | `aa4951fd` → `304690e` (WORKDAY, PIVOTBY, SORT e as funções D param de reescanear a entrada); `bbe08254` → `f8ca170` (TEXTJOIN monta o resultado dentro do limite de texto); `7cb00883`+`9ab297ce` → `47045bf` (edição estrutural reescreve só as fórmulas que muda, com os oráculos `adjust_oracle` e `structural_edit_rewrite`); `35e98156` → `d6f0f32` (um orçamento de trabalho só para todas as chamadas de uma função elevada); `67a0b7f3`+`bc162524` → `293e380` (rasterização, splines e rótulos de categoria com teto) | `065f05db` e `db05400e` já estavam na base; de `bc162524`, o caminho rápido `needs_sanitizing` (sempre sanitizamos e os níveis já têm teto), o remendo de `BarRun` (não temos a fusão de barras) e o da média móvel (somamos a janela direto, sem somas de bloco) |
+| 2026-11-21 | `origin/main` of 2026-11-21 (`11a5711a`); commits from 2026-11-03 to 2026-11-11 | `aa4951fd` → `304690e` (WORKDAY, PIVOTBY, SORT and the D functions stop rescanning the input); `bbe08254` → `f8ca170` (TEXTJOIN builds the result inside the text limit); `7cb00883`+`9ab297ce` → `47045bf` (structural edit rewrites only the formulas it changes, with the `adjust_oracle` and `structural_edit_rewrite` oracles); `35e98156` → `d6f0f32` (a single work budget for all the calls of a hoisted function); `67a0b7f3`+`bc162524` → `293e380` (rasterization, splines and category labels with a cap) | `065f05db` and `db05400e` were already in the base; from `bc162524`, the `needs_sanitizing` fast path (we always sanitize and the levels already have a cap), the `BarRun` patch (we don't have bar merging) and the moving-average one (we sum the window directly, without block sums) |
 
-Nenhum item pediu crate ou API que não temos; o único pré-requisito foi `Formula::with_expr` (do
-`b6bbdcd5`, que não temos), trazido junto no commit do item 3.
+No item asked for a crate or API we don't have; the only prerequisite was `Formula::with_expr`
+(from `b6bbdcd5`, which we don't have), brought along in item 3's commit.
