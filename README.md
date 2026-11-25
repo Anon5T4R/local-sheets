@@ -33,7 +33,8 @@
   waterfall, funnel, treemap, sunburst, box and whisker, stock and combo charts, with a Chart Design
   tab and a format pane.
 - **Print and export.** Page setup, Page Break Preview, printing through the system spooler, and a
-  self-contained PDF writer (the active sheet, or every sheet of the workbook).
+  self-contained PDF writer: the Save As PDF exports the active sheet; every sheet goes through the
+  `sheets: "all"` parameter (CLI and MCP).
 - **Automate.** Everything the app does to a workbook is a command with undo, and the ribbon, the
   keyboard, the CLI and MCP all run the same command ids. A command search finds any of them.
   Macros are typed lists of those same commands (recorded or written by hand), not VBA.
@@ -49,20 +50,23 @@
 
 | Format | Read | Write |
 | --- | --- | --- |
-| `.xlsx` (native) | yes: styles, themes, formulas, tables, conditional formatting, validation, comments, links, charts, pictures, sparklines, PivotTables and print setup | yes |
-| `.csv`, `.tsv` | yes | yes |
-| `.txt` | yes, read as tab-separated | no |
+| `.xlsx`, `.xlsm` (native) | yes: styles, themes, formulas, tables, conditional formatting, validation, comments, links, charts, pictures, sparklines, PivotTables and print setup; an `.xlsm` keeps its VBA project, which is never run | yes (saving to `.xlsm` writes the VBA project back) |
+| `.xltx` (template) | yes, as a workbook | yes, by path (CLI and MCP) |
+| `.xlt` (Excel 97–2003 template) | partial, like `.xls` below | no |
+| `.csv`, `.tsv`, `.txt`, `.tab` | yes (comma and tab-separated text) | yes: CSV in the Save As list; TSV, TXT and TAB by path (CLI and MCP) |
+| `.json` | Local Sheets' own JSON workbook, for scripts | yes, by path (CLI and MCP) |
 | `.ods` | worksheet data; a formula becomes its last saved result | no |
 | `.xlsb` | worksheet data; a formula becomes its last saved result | no |
 | `.xls` (Excel 97–2003) | partial: values, formulas, number formats, cell formatting, merges, row and column sizes, names and print setup; charts, pictures, comments, conditional formats and validation are skipped with a warning | no |
 | `.slk` (SYLK) | values, formulas and number formats | no |
 | `.html` | a page's table, opened as a sheet | yes (Save as Web Page) |
-| `.pdf` | — | yes: the active sheet, or every sheet |
+| `.pdf` | — | yes: the active sheet; every sheet with `sheets: "all"` (CLI and MCP) |
 | `.xlsx` with a password | yes (Agile and Standard encryption) | saved without the password |
 
 XLSX is the native format because it is the one other tools read: the fork introduces no format of
-its own. Parts of a workbook the app does not model (controls, query tables, external workbook
-links and similar) are carried through a save, so opening and saving does not throw them away.
+its own. Parts of a workbook the app does not model (ActiveX controls, OLE objects, XML maps and
+similar) are carried through a save, so opening and saving does not throw them away; that
+pass-through has never been checked in Excel ([architecture notes](docs/architecture.md)).
 
 CSV fields are read like typed cell input, so `000123` is read as a number; the `file.open` command
 takes `csvAsText` to keep every field as text, which matters for SKUs, GTINs and ZIP codes. Python
@@ -70,6 +74,28 @@ cells (`PY`) that a file carries are kept and saved, but this build runs no Pyth
 code shows `#BLOCKED!`. PDF export uses the 14 standard PDF fonts and embeds no font; characters
 outside them are written in a predefined Adobe-GB1 CID font, and scripts that need shaping (Arabic,
 Devanagari, Thai) are not shaped yet.
+
+## Network and privacy
+
+- Your workbooks never leave the computer through the app.
+- When it starts, the app asks GitHub whether a newer release exists and offers it. There is no
+  setting to turn the check off yet; a check that fails stays in the log and says nothing.
+- AI does nothing until you add a provider and your own key (see [AI](#ai)).
+- No account, analytics or crash reporting.
+
+Security notes, all checkable in this repository:
+
+- The app's own crates and both binaries forbid `unsafe`. Lower layers do, as every desktop app's
+  do: the window system (winit) and the GPU (wgpu).
+- Updates and AI requests use rustls with a pure-Rust provider (RustCrypto); no C TLS library is in
+  the installed program.
+- A downloaded update is checked against the release's SHA-256, and a file that no published
+  checksum vouches for is refused before it is installed. The minisign signature check on the
+  downloaded asset is advisory today: a mismatch is logged, not blocked.
+- Releases are built only by GitHub Actions from a tagged commit with locked dependencies.
+  `cargo-deny` checks licenses, bans and sources, and no dependency may come from a git URL; the
+  accepted advisory exceptions are written down with their reasons in
+  [deny.toml](deny.toml).
 
 ## Where it comes from
 
@@ -103,38 +129,19 @@ reach the network through a pure-Rust TLS provider (rustls with RustCrypto, in
 file compatibility), reviewed one by one and adapted. New features and UI changes are not merged
 automatically. Each sync is recorded in [docs/UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md).
 
-## Network and privacy
 
-- Your workbooks never leave the computer through the app.
-- When it starts, the app asks GitHub whether a newer release exists and offers it. There is no
-  setting to turn the check off yet; a check that fails stays in the log and says nothing.
-- AI does nothing until you add a provider and your own key (see [AI](#ai)).
-- No account, analytics or crash reporting.
-
-Security notes, all checkable in this repository:
-
-- The app's own crates and both binaries forbid `unsafe`. Lower layers do, as every desktop app's
-  do: the window system (winit) and the GPU (wgpu).
-- Updates and AI requests use rustls with a pure-Rust provider (RustCrypto); no C TLS library is in
-  the installed program.
-- A downloaded update is checked against the release's SHA-256, and a file that no published
-  checksum vouches for is refused before it is installed. The minisign signature check on the
-  downloaded asset is advisory today: a mismatch is logged, not blocked.
-- Releases are built only by GitHub Actions from a tagged commit with locked dependencies.
-  `cargo-deny` checks licenses, bans and sources, and no dependency may come from a git URL; the
-  accepted advisory exceptions are written down with their reasons in
-  [deny.toml](deny.toml).
 
 ## Download
 
-Windows 10/11 (x64): an `.msi` per-machine or per-user installer, or a portable `.zip` with
+Windows (x64): an `.msi` per-machine or per-user installer, or a portable `.zip` with
 `localsheets.exe` and `localsheets-cli.exe`. Linux (x86_64): `.AppImage`, `.deb`, `.rpm`, `.tar.gz`
 or an Arch `.pkg.tar.zst`. All in
 [Releases](https://github.com/Anon5T4R/local-sheets/releases/latest). macOS and BSD build from
 source; no artifacts are published for them.
 
-Each file is signed with [minisign](https://jedisct1.github.io/minisign/), the same key as every
-Local app, and each release carries `SHA256SUMS.txt`. To check a file:
+Each file is signed with [minisign](https://jedisct1.github.io/minisign/) when the release pipeline
+has the signing key (the same key as every Local app); check that the `.minisig` file is in the
+release before relying on the signature. Each release carries `SHA256SUMS.txt`. To check a file:
 
 ```sh
 minisign -Vm <file> -P RWTqN+hTTCFbDCGCA1cEJRLp2FSluxIUiJfqdoAYwkwNNVH5MTYH8qSN
@@ -144,6 +151,18 @@ The `.deb` and `.rpm` depend on xkbcommon and Vulkan or EGL, and recommend the X
 client libraries and a desktop portal, because the app opens those when it starts; a tarball install
 has to provide them itself. The lists are in
 [packaging/linux/nfpm.yaml](packaging/linux/nfpm.yaml).
+
+
+
+## How it is made
+
+Local Sheets follows the same rules as every Local app: local files and no account, Rust only
+(including the UI and the cryptography), one self-contained repository per app, forks with selective
+sync, governed dependencies, signed releases built from a tag, optional AI with your own provider,
+and MCP so agents can use the app. Most of the code is written by AI coding agents (Claude Code and
+OpenCode) from written plans, reviewed by the maintainer and held to the same checks and CI. The
+reasons for each decision:
+[How we make the Local apps](https://github.com/Styx-Studios/.github/blob/main/profile/README.md#how-we-make-the-local-apps).
 
 ## Build from source
 
@@ -157,18 +176,9 @@ cargo xtask ci                       # all local checks
 ```
 
 The bundled fonts come from `assets/craft-fonts`, which is vendored and always embedded by the
-build. On Linux the build also needs `pkg-config` and the X11, Wayland, GTK3 and xkbcommon
-development packages; the CI workflow has the exact list.
-
-## How it is made
-
-Local Sheets follows the same rules as every Local app: local files and no account, Rust only
-(including the UI and the cryptography), one self-contained repository per app, forks with selective
-sync, governed dependencies, signed releases built from a tag, optional AI with your own provider,
-and MCP so agents can use the app. Most of the code is written by AI coding agents (Claude Code and
-OpenCode) from written plans, reviewed by the maintainer and held to the same checks and CI. The
-reasons for each decision:
-[How we make the Local apps](https://github.com/Styx-Studios/.github/blob/main/profile/README.md#how-we-make-the-local-apps).
+build. On Linux the build needs, among others, `pkg-config` and the X11, Wayland, GTK3 and
+xkbcommon development packages; the exact list is in the
+[CI workflow](.github/workflows/ci.yml).
 
 ## AI
 
@@ -177,11 +187,27 @@ OpenRouter, OpenCode Zen or Go, or any OpenAI-compatible endpoint), an editable 
 from the provider's own list, and your key. The key goes to the operating system's keychain, not to
 a file in the repository.
 
-It has four actions: write a table from a description, continue a column, write one formula for a
-cell, and label the columns of a table so the app can apply one of its own formatting presets. An
-answer is applied through the app's own commands in one undo step, so a failed apply rolls back,
-and an answer that does not fit the sheet is a message, not a half-written sheet. The text you send
-goes only to the provider you chose; a local server such as llama.cpp or Ollama works the same way.
+Its actions: write a table from a description, continue a column, write one formula for a cell, and
+label the columns of a table so the app can apply one of its own formatting presets. An answer is
+applied through the app's own commands in one undo step, so a failed apply rolls back, and an answer
+that does not fit the sheet is a message, not a half-written sheet. The text you send goes only to
+the provider you chose; a local server such as llama.cpp or Ollama works the same way.
+
+## The Local apps
+
+[Local Word](https://github.com/Anon5T4R/local-office) ·
+[Local Sheets](https://github.com/Anon5T4R/local-sheets) ·
+[Local Slides](https://github.com/Anon5T4R/local-slides) ·
+[Local PDF](https://github.com/Anon5T4R/local-pdf) ·
+[Local Keys](https://github.com/Anon5T4R/Local-Keys) ·
+[Local Image](https://github.com/Anon5T4R/Local-Image) ·
+[Local Photo](https://github.com/Anon5T4R/Local-Photo) ·
+[Local Paint](https://github.com/Anon5T4R/Local-Paint) ·
+[Local Vector](https://github.com/Anon5T4R/Local-Vector) ·
+[Local Player](https://github.com/Anon5T4R/Local-Player) ·
+[Local Notebook](https://github.com/Anon5T4R/Local-Obsidian) ·
+[Local Mindmap](https://github.com/Anon5T4R/Local-Mind) ·
+[Local Utils](https://github.com/Anon5T4R/Local-Utils)
 
 ## License and credits
 
@@ -191,5 +217,4 @@ font, icon and image with its author, source and license is in [ATTRIBUTION.md](
 Builds embed the `craft-fonts` fonts (SIL Open Font License 1.1), listed there too.
 
 Local Sheets is an independent app and is not affiliated with Microsoft; the Excel names in the
-interface describe compatible behaviour. Other Local apps:
-[the full list](https://github.com/Styx-Studios).
+interface describe compatible behaviour.
