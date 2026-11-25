@@ -1,257 +1,195 @@
 <p align="center">
-  <img src="assets/app-icon/hicolor/256x256/apps/com.local.localsheets.png" width="128" height="128" alt="Local Sheets icon: a spreadsheet page on a green tile">
+  <img src="assets/app-icon/hicolor/256x256/apps/com.local.localsheets.png" width="96" height="96" alt="Local Sheets icon">
 </p>
 
 <h1 align="center">Local Sheets</h1>
 
 <p align="center">
-  <b>Spreadsheets and data; an open-source, modern spreadsheet application, built in pure Rust.</b>
+  A desktop spreadsheet for Windows and Linux. It opens and saves <code>.xlsx</code>, works offline,
+  needs no account, and is written in Rust, interface included.<br>
+  <a href="https://github.com/Anon5T4R/local-sheets/releases/latest">Download</a> ·
+  <a href="ROADMAP.md">Roadmap and status</a> ·
+  <a href="#where-it-comes-from">Where it comes from</a> ·
+  <a href="#how-it-is-made">How it is made</a>
 </p>
 
-<p align="center">
-  Build workbooks with formulas, tables, charts, pivot tables and conditional formatting,
-  open and save .xlsx workbooks, and print or export them to PDF. Native on Windows, Linux,
-  macOS and BSD, and in the browser. Every button is also a command that the CLI and AI agents
-  (through MCP) can drive.
-</p>
+<!-- screenshot: a sample workbook with a formatted table, a chart and the formula bar in use; dark and light -->
 
+## What it does
 
-<br>
+- **Write and edit.** A ribbon, a formula bar that points at cells while you build a formula (type
+  `=SUM(` and click the range), the Name Box, sheet tabs, a fill handle, in-cell editing, Format
+  Cells, Paste Special, Find and Replace, and Flash Fill.
+- **Calculate.** A dependency-graph engine with dynamic arrays and spilling, LET and LAMBDA with the
+  functions that take one (MAP, REDUCE, SCAN, BYROW, BYCOL, MAKEARRAY), structured table
+  references, iterative calculation, and the worksheet function families Excel users look for:
+  lookup, text, date, statistics, financial, engineering and database.
+- **Format.** Cell styles and themes, borders, conditional formatting (rules, data bars, colour
+  scales, icon sets), table styles, and pictures inside a cell as well as floating over the grid.
+- **Analyse.** Sort, AutoFilter and Advanced Filter, Text to Columns, Remove Duplicates, data
+  validation, outlines and subtotals, PivotTables with a field list, Goal Seek, Solver (linear,
+  nonlinear and evolutionary), the Data Analysis tools, and what-if scenarios and data tables.
+- **Chart.** Columns and bars, line, area, pie, doughnut, scatter, bubble, radar, histogram,
+  waterfall, funnel, treemap, sunburst, box and whisker, stock and combo charts, with a Chart Design
+  tab and a format pane.
+- **Print and export.** Page setup, Page Break Preview, printing through the system spooler, and a
+  self-contained PDF writer (the active sheet, or every sheet of the workbook).
+- **Automate.** Everything the app does to a workbook is a command with undo, and the ribbon, the
+  keyboard, the CLI and MCP all run the same command ids. A command search finds any of them.
+  Macros are typed lists of those same commands (recorded or written by hand), not VBA.
+- **Work in your window.** Each workbook opens in its own window; the interface is translated and
+  the View tab switches the language, Spanish also switches formula entry to its Spanish names for
+  the common functions, with decimal commas and semicolon separators, and the theme is Automatic,
+  Light or Dark.
+- **Drive it from outside.** A CLI, a JSON control channel on localhost, and an MCP server use the
+  same commands a person does, headless or in the window you are looking at
+  ([docs/cli.md](docs/cli.md), [docs/mcp.md](docs/mcp.md)).
 
+## Formats
 
+| Format | Read | Write |
+| --- | --- | --- |
+| `.xlsx` (native) | yes: styles, themes, formulas, tables, conditional formatting, validation, comments, links, charts, pictures, sparklines, PivotTables and print setup | yes |
+| `.csv`, `.tsv` | yes | yes |
+| `.txt` | yes, read as tab-separated | no |
+| `.ods` | worksheet data; a formula becomes its last saved result | no |
+| `.xlsb` | worksheet data; a formula becomes its last saved result | no |
+| `.xls` (Excel 97–2003) | partial: values, formulas, number formats, cell formatting, merges, row and column sizes, names and print setup; charts, pictures, comments, conditional formats and validation are skipped with a warning | no |
+| `.slk` (SYLK) | values, formulas and number formats | no |
+| `.html` | a page's table, opened as a sheet | yes (Save as Web Page) |
+| `.pdf` | — | yes: the active sheet, or every sheet |
+| `.xlsx` with a password | yes (Agile and Standard encryption) | saved without the password |
 
-<p align="center">
-  <a href="#what-works-today">What works</a> ·
-  <a href="#getting-started">Getting started</a> ·
-  <a href="#agents-cli-and-mcp">Agents, CLI and MCP</a> ·
-  <a href="#roadmap">Roadmap</a> ·
-  <a href="#downloads">Downloads</a> ·
-  <a href="#the-local-suite">The Local suite</a> ·
-  <a href="#license-and-credits">License</a>
-</p>
+XLSX is the native format because it is the one other tools read: the fork introduces no format of
+its own. Parts of a workbook the app does not model (controls, query tables, external workbook
+links and similar) are carried through a save, so opening and saving does not throw them away.
 
-## What works today
+CSV fields are read like typed cell input, so `000123` is read as a number; the `file.open` command
+takes `csvAsText` to keep every field as text, which matters for SKUs, GTINs and ZIP codes. Python
+cells (`PY`) that a file carries are kept and saved, but this build runs no Python: new or changed
+code shows `#BLOCKED!`. PDF export uses the 14 standard PDF fonts and embeds no font; characters
+outside them are written in a predefined Adobe-GB1 CID font, and scripts that need shaping (Arabic,
+Devanagari, Thai) are not shaped yet.
 
-Local Sheets is in alpha (see the [roadmap](ROADMAP.md)). Today it can:
+## Where it comes from
 
-- **Write and edit**: ribbon, formula bar, Name Box, sheet tabs, keyboard shortcuts, fill handle,
-  point-mode formula entry with coloured references, Format Cells, Paste Special, Find and Replace,
-  Flash Fill, drag-and-drop and in-cell editing.
-- **Calculate**: a dependency-graph engine with dynamic arrays and spilling, 500+ worksheet
-  functions plus LET, LAMBDA, MAP, REDUCE, SCAN, BYROW, BYCOL and MAKEARRAY, structured table
-  references, iterative calculation and a comprehensive number-format language.
-- **Format**: cell styles, themes, borders, conditional formatting (rules, data bars, colour
-  scales, icon sets), tables with styles, and per-cell pictures.
-- **Analyse**: sort and AutoFilter, data validation, outlining and subtotals, pivot tables with
-  field lists and show-values-as, Goal Seek, Solver and the Data Analysis tools, plus what-if
-  scenarios.
-- **Chart**: seventeen chart types with a Chart Design tab and a Format pane; selecting a chart
-  outlines its source data.
-- **Exchange files**: .xlsx is the native format, with styles, themes, formulas, tables,
-  conditional formats, validation, comments, hyperlinks, charts, pictures, sparklines, pivot
-  tables and print settings round-tripping. CSV and TSV too; legacy .xls, XLSB and ODS worksheet
-  data import their values; password-protected workbooks are decrypted.
-- **Print and export**: page setup, Page Break Preview, printing to the system print dialog and a
-  self-contained PDF export.
-- **Automate**: every ribbon button, menu item, dialog, keystroke and mouse gesture is a command
-  with undo, all scriptable from the CLI, a JSON control channel and an MCP server for AI agents.
-- **Run everywhere**: one Rust codebase for Windows, macOS and Linux; no subscription, no licence
-  server, no telemetry.
+Local Sheets is a fork of [GridCraft](https://github.com/storytold/gridcraft) by
+[ArtCraft](https://getartcraft.com), MIT or Apache-2.0, started from the upstream `v0.16.1` tree.
+The spreadsheet engine is their work: the formula language, the calculation engine, the XLSX reader
+and writer, and the decision to write all of it in Rust.
 
-The honest picture, area by area, is in [ROADMAP.md](ROADMAP.md).
+**Why a fork.** We wanted a set of desktop apps that look and behave the same, update and sign the
+same way, and follow our own priorities: Windows and Linux first, files that stay local, AI only
+with your own key, and agents able to drive every app. A fork lets us decide that without asking the
+upstream to change direction.
 
-## Getting started
+We also wanted "written in Rust" to hold for everything the app runs. The updater and the AI client
+reach the network through a pure-Rust TLS provider (rustls with RustCrypto, in
+`libs/rustls-rustcrypto`), so `ring`, `aws-lc` and OpenSSL are not in the program you install.
+
+**What changed here:**
+
+- Name, icon, app and installer identifiers, and the configuration folder.
+- The shell shared by all Local apps: Automatic/Light/Dark themes, settings, command search, the AI
+  tab and the update prompt.
+- Our own updater (a permanent fork of the suite's updater) and our own release pipeline: MSIs
+  per-machine and per-user, plus a portable ZIP on Windows; AppImage, deb, rpm, tarball and an Arch
+  package on Linux; all published from a tag.
+- XLSX stays the native format, so files and tools from the upstream and from Excel stay
+  compatible.
+- Live automation of the open app goes through `craft-mcp`, shared by the Local apps.
+
+**What we still take from upstream:** bug fixes that matter to us (crashes, data loss, security,
+file compatibility), reviewed one by one and adapted. New features and UI changes are not merged
+automatically. Each sync is recorded in [docs/UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md).
+
+## Network and privacy
+
+- Your workbooks never leave the computer through the app.
+- When it starts, the app asks GitHub whether a newer release exists and offers it. There is no
+  setting to turn the check off yet; a check that fails stays in the log and says nothing.
+- AI does nothing until you add a provider and your own key (see [AI](#ai)).
+- No account, analytics or crash reporting.
+
+Security notes, all checkable in this repository:
+
+- The app's own crates and both binaries forbid `unsafe`. Lower layers do, as every desktop app's
+  do: the window system (winit) and the GPU (wgpu).
+- Updates and AI requests use rustls with a pure-Rust provider (RustCrypto); no C TLS library is in
+  the installed program.
+- A downloaded update is checked against the release's SHA-256, and a file that no published
+  checksum vouches for is refused before it is installed. The minisign signature check on the
+  downloaded asset is advisory today: a mismatch is logged, not blocked.
+- Releases are built only by GitHub Actions from a tagged commit with locked dependencies.
+  `cargo-deny` checks licenses, bans and sources, and no dependency may come from a git URL; the
+  accepted advisory exceptions are written down with their reasons in
+  [deny.toml](deny.toml).
+
+## Download
+
+Windows 10/11 (x64): an `.msi` per-machine or per-user installer, or a portable `.zip` with
+`localsheets.exe` and `localsheets-cli.exe`. Linux (x86_64): `.AppImage`, `.deb`, `.rpm`, `.tar.gz`
+or an Arch `.pkg.tar.zst`. All in
+[Releases](https://github.com/Anon5T4R/local-sheets/releases/latest). macOS and BSD build from
+source; no artifacts are published for them.
+
+Each file is signed with [minisign](https://jedisct1.github.io/minisign/), the same key as every
+Local app, and each release carries `SHA256SUMS.txt`. To check a file:
+
+```sh
+minisign -Vm <file> -P RWTqN+hTTCFbDCGCA1cEJRLp2FSluxIUiJfqdoAYwkwNNVH5MTYH8qSN
+```
+
+The `.deb` and `.rpm` depend on xkbcommon and Vulkan or EGL, and recommend the X11 and Wayland
+client libraries and a desktop portal, because the app opens those when it starts; a tarball install
+has to provide them itself. The lists are in
+[packaging/linux/nfpm.yaml](packaging/linux/nfpm.yaml).
+
+## Build from source
+
+Rust 1.95 or newer.
 
 ```sh
 git clone https://github.com/Anon5T4R/local-sheets
 cd local-sheets
-cargo build --locked
-cargo run --release -p localsheets -- --sample sales        # the desktop app with the sample workbook
-cargo run --release -p localsheets -- book.xlsx             # open a workbook
-cargo run --release -p localsheets -- --sample sales --control 7979   # + JSON control channel
-cargo xtask ci                                              # fmt, clippy, tests, assets, layering
+cargo run --release -p localsheets   # the app
+cargo xtask ci                       # all local checks
 ```
 
-The built-in samples are `sales` (quarterly sales dashboard), `budget` (household budget) and
-`grades` (gradebook with formulas). Under File › Options › Interface language the interface also
-speaks Spanish, with Spanish formula names, decimal commas and semicolon arguments; workbooks,
-clipboard exchange and programmatic APIs keep canonical English syntax. See
-[docs/formula-input.md](docs/formula-input.md).
+The bundled fonts come from `assets/craft-fonts`, which is vendored and always embedded by the
+build. On Linux the build also needs `pkg-config` and the X11, Wayland, GTK3 and xkbcommon
+development packages; the CI workflow has the exact list.
 
-Fonts come from craft-fonts, vendored in `assets/craft-fonts/` (`.cargo/config.toml` points
-`CRAFT_FONTS_DIR` at it, so every build embeds them); override `CRAFT_FONTS_DIR` to build with another
-checkout.
+## How it is made
 
-Printing goes through the shared `craft-print` crate from `libs/craft-libs` (the Windows spooler, or
-CUPS `lp` elsewhere); PDF export uses the self-contained writer in
-[`crates/pdf`](crates/pdf/README.md), which has no dependencies and embeds no font files.
+Local Sheets follows the same rules as every Local app: local files and no account, Rust only
+(including the UI and the cryptography), one self-contained repository per app, forks with selective
+sync, governed dependencies, signed releases built from a tag, optional AI with your own provider,
+and MCP so agents can use the app. Most of the code is written by AI coding agents (Claude Code and
+OpenCode) from written plans, reviewed by the maintainer and held to the same checks and CI. The
+reasons for each decision:
+[How we make the Local apps](https://github.com/Styx-Studios/.github/blob/main/profile/README.md#how-we-make-the-local-apps).
 
-### Logs
+## AI
 
-The desktop app writes its `log` records to standard error and to `logs/localsheets.log` in the
-settings directory, beside its other saved state (Linux `~/.config/localsheets/logs/`, or
-`$XDG_CONFIG_HOME/localsheets/logs/`; macOS `~/Library/Application Support/Local Sheets/logs/`;
-Windows `%APPDATA%\Local Sheets\logs\`). A start from a desktop menu has no terminal, so this file
-is what to attach to a bug report: import problems, recovery saves and graphics-backend fallbacks
-land there. Each launch moves the previous log to `localsheets.1.log` (and that one to
-`localsheets.2.log`), so the log of a run that crashed survives the next start. The file stops
-growing at 16 MiB. Runs with `LOCALSHEETS_NO_PREFS` set (no saved settings) log to standard error
-only.
+The AI tab is off until you add a connection: a provider preset (Google Gemini, OpenAI, Groq,
+OpenRouter, OpenCode Zen or Go, or any OpenAI-compatible endpoint), an editable base URL, a model
+from the provider's own list, and your key. The key goes to the operating system's keychain, not to
+a file in the repository.
 
-| Variable | Effect |
-|---|---|
-| `RUST_LOG` | Log levels for standard error and the log file. Default: `info` for Local Sheets' own crates, `warn` for everything else. env_logger-style directives replace that, e.g. `RUST_LOG=debug`, `RUST_LOG=warn,localsheets_engine=debug` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`localsheets*=debug`). |
-
-## Agents, CLI and MCP
-
-Every action in Local Sheets is a command with a stable id, so people, scripts and AI agents use the
-same verbs:
-
-```sh
-localsheets-cli commands --search chart                     # every command and its params
-localsheets-cli eval '=XLOOKUP("b",{"a","b"},{1,2})'        # → 2
-localsheets-cli run --sample budget --cmd 'home.bold={"range":"B4:F4"}' --out budget.xlsx
-localsheets-cli cat budget.xlsx --range B4:F15              # aligned text table
-localsheets-cli mcp                                         # MCP server over stdio (headless)
-localsheets-cli mcp --connect 7979                          # MCP bridged to a running window
-```
-
-The MCP server offers tools such as `read_range`, `write_range`, `set_cell`, `evaluate_formula`,
-`format_range`, `insert_chart`, `create_table`, `sort_range`, `filter` and `execute_command`
-(which reaches every one of Local Sheets' commands). The desktop app's control channel adds real
-pointer and keyboard input, dialogs and screenshots. See [`docs/mcp.md`](docs/mcp.md),
-[`docs/cli.md`](docs/cli.md) and [`docs/control-protocol.md`](docs/control-protocol.md).
-
-## Architecture
-
-| Layer | Crate | Job |
-|---|---|---|
-| L0 | `localsheets-core`, `localsheets-numfmt`, `localsheets-pdf` | addresses, values, errors, dates, input parsing; number-format codes; PDF 1.7 writer |
-| L1 | `localsheets-formula`, `localsheets-functions`, `localsheets-math` | lexer, parser, printer, reference adjustment; worksheet functions; equation layout |
-| L2 | `localsheets-model`, `localsheets-calc`, `localsheets-xlsx` | workbook, sheets, copy-on-write cells, styles, tables, charts; dependency graph and evaluator; XLSX, CSV, XLSB and ODS data import |
-| L3 | `localsheets-chart` | toolkit-free chart layout and rendering |
-| L5 | `localsheets-engine` | session, commands, history, clipboard, fill, sort, filter, file I/O |
-| L6 | `localsheets-ui-egui`, `localsheets-mcp` | spreadsheet UI and control channel; MCP server |
-| L7 | apps | `localsheets` (desktop), `localsheets-cli` |
-
-`cargo xtask ci` runs formatting, clippy, the tests, the asset-attribution check, the layering
-check and the generated keytip check. Contributor and agent instructions:
-[AGENTS.md](AGENTS.md).
-
-## Roadmap
-
-Local Sheets is in **alpha**: it opens, edits and saves spreadsheets for real work, and the way to
-"ready for real work" is in [ROADMAP.md](ROADMAP.md) (XLSX fidelity on real-world files, very large
-workbooks and multi-threaded recalc, chart depth, text in every script, `.xls` import, PivotTable
-depth, keyboard coverage and the remaining translations).
-
-## Downloads
-
-**Download Local Sheets** from GitHub: the [latest release](https://github.com/Anon5T4R/local-sheets/releases/latest)
-has every build listed below, and [all releases](https://github.com/Anon5T4R/local-sheets/releases)
-has earlier versions and their notes. `<ver>` in the file names is the version number, and
-`SHA256SUMS.txt` lists a checksum for every file.
-
-### Windows
-
-| Build | Installer (all users) | Installer (just me) | Portable |
-|---|---|---|---|
-| x64 (64-bit Intel/AMD) | `localsheets-<ver>-windows-x64.msi` | `localsheets-<ver>-windows-user-x64.msi` | `localsheets-<ver>-windows-x64-portable.zip` |
-| arm64 (Snapdragon and other ARM PCs) | `localsheets-<ver>-windows-arm64.msi` | `localsheets-<ver>-windows-user-arm64.msi` | `localsheets-<ver>-windows-arm64-portable.zip` |
-| x86 (32-bit) | `localsheets-<ver>-windows-x86.msi` | `localsheets-<ver>-windows-user-x86.msi` | `localsheets-<ver>-windows-x86-portable.zip` |
-
-The all-users installer puts Local Sheets in `Program Files\Local Sheets` and needs administrator
-rights. The just-me installer needs none: it installs into `%LOCALAPPDATA%\Programs\Local Sheets`
-for your account only. Choose one: installing both gives two Local Sheets entries in Settings › Apps
-and two in the Start menu. The portable ZIP carries `localsheets.exe` and `localsheets-cli.exe` and
-needs no installation. Installers and executables are code-signed.
-
-**If the app doesn't open on Windows:** the desktop app initializes only DirectX 12 by default.
-Letting wgpu also create an OpenGL instance can crash some graphics drivers (AMD's
-`atio6axx.dll`) before the window appears, so the app would flash in Task Manager and quit.
-`WGPU_BACKEND` overrides the default for troubleshooting (for example `dx12` or `vulkan`). In
-PowerShell, from the folder containing the executable:
-
-```powershell
-$env:WGPU_BACKEND = "vulkan"
-& .\localsheets.exe
-Remove-Item Env:WGPU_BACKEND                     # restore the default for later launches
-```
-
-An explicit `gl` override can bring the driver crash back on affected systems. The macOS and Linux
-backend defaults are unchanged.
-
-DirectX 12 shaders are compiled with FXC, which is part of Windows, so no `dxcompiler.dll` or
-`dxil.dll` is needed. `$env:WGPU_DX12_COMPILER = "dxc"` (or `"auto"`) selects wgpu's DXC handling
-again for troubleshooting.
-
-### Linux
-
-| Format | File | Notes |
-|---|---|---|
-| AppImage | `localsheets-<ver>-linux-x86_64.AppImage` | Runs anywhere; unpack and run |
-| Debian/Ubuntu | `localsheets-<ver>-linux-x86_64.deb` | |
-| Fedora/RHEL/openSUSE | `localsheets-<ver>-linux-x86_64.rpm` | |
-| Tarball | `localsheets-<ver>-linux-x86_64.tar.gz` | Unpack anywhere |
-
-**Runtime libraries.** The window-system, GPU and file-dialog libraries Local Sheets needs are
-opened when the app starts (`dlopen` through `x11-dl`, `xkbcommon-dl`, `ash`, `glutin` and `rfd`)
-instead of being linked in, so `ldd` shows none of them: an install that satisfies the linked
-dependencies can still fail at start-up with a loader error and no hint of what to install. The
-`.deb` and `.rpm` declare the set in `packaging/linux/nfpm.yaml`; a tarball install or a musl system
-has to provide it itself:
-
-```sh
-apk add libx11 libxcursor libxrandr libxi libxkbcommon xkeyboard-config \
-        wayland-libs-client \
-        vulkan-loader mesa-vulkan-swrast \
-        mesa-gl mesa-egl mesa-dri-gallium \
-        xdg-desktop-portal
-```
-
-Alpine Linux `v3.22` names above; Void's musl variant uses the same `/lib/ld-musl-x86_64.so.1`
-loader and the same libraries as `libX11 libXcursor libXrandr libXi libxkbcommon xkeyboard-config
-wayland vulkan-loader mesa xdg-desktop-portal`. There is no musl build among the release artifacts
-yet — this is what a build from source on musl needs at run time.
-
-- `mesa-vulkan-swrast` is the software Vulkan driver: it runs anywhere, VMs and containers
-  included. On a real GPU install your vendor's driver instead (`mesa-vulkan-intel`,
-  `mesa-vulkan-ati`, `mesa-vulkan-nouveau`, …).
-- Without Vulkan the app falls back to CPU rendering through Mesa's GL drivers. It works, but
-  slowly — a driver limit, not a Local Sheets bug.
-- `xdg-desktop-portal` (with `xdg-desktop-portal-gtk` or `-kde`; `-wlr` has no file chooser, so
-  on wlroots compositors install `zenity`) is what the Open and Save dialogs talk to;
-  `xkeyboard-config` holds the XKB keyboard data `libxkbcommon` reads.
-- fontconfig and freetype are not needed: Local Sheets reads `/usr/share/fonts` itself.
-
-Building from source on Linux needs `pkg-config libxkbcommon-dev libwayland-dev libx11-dev
-libxcursor-dev libxrandr-dev libxi-dev libgtk-3-dev libxcb1-dev`.
-
-### macOS and BSD
-
-There is no published macOS or BSD artifact yet: both build from source with `cargo build
---locked` (the DMG and FreeBSD packaging in `packaging/` is kept for when there are).
-
-## The Local suite
-
-Local Sheets is one of the **Local** apps: free, open-source, local-first tools, each written from
-scratch in Rust and each able to stand on its own — no account, no telemetry, no server.
-
-<br>
+It has four actions: write a table from a description, continue a column, write one formula for a
+cell, and label the columns of a table so the app can apply one of its own formatting presets. An
+answer is applied through the app's own commands in one undo step, so a failed apply rolls back,
+and an answer that does not fit the sheet is a message, not a half-written sheet. The text you send
+goes only to the provider you chose; a local server such as llama.cpp or Ollama works the same way.
 
 ## License and credits
 
-Local Sheets is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
-Copyright (c) 2026 the Local Sheets contributors. Required notices are in [NOTICE](NOTICE).
+MIT or Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE),
+[NOTICE](NOTICE)). The upstream GridCraft and ArtCraft credits are kept in `NOTICE`; every bundled
+font, icon and image with its author, source and license is in [ATTRIBUTION.md](ATTRIBUTION.md).
+Builds embed the `craft-fonts` fonts (SIL Open Font License 1.1), listed there too.
 
-Bundled fonts, icons, images and other assets keep their own open licenses; each one is listed
-with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md).
-
-Local Sheets is an independent fork of [GridCraft](https://github.com/storytold/gridcraft),
-maintained by Anon5T4R in the Local suite. "GridCraft" and "ArtCraft" are names of the upstream
-project and its team; this repository and its packages use only the Local Sheets name.
-`docs/UPSTREAM-SYNC.md` documents how changes are taken from the upstream and what stays local.
-
-<p align="center">
-  <sub>Suíte Local — apps locais, sem conta, sem telemetria.</sub>
-</p>
+Local Sheets is an independent app and is not affiliated with Microsoft; the Excel names in the
+interface describe compatible behaviour. Other Local apps:
+[the full list](https://github.com/Styx-Studios).
