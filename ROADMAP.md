@@ -21,7 +21,8 @@ path to "ready for real work".
   the 14 standard fonts.
 - **`.xls` and protected files.** `.xls` (BIFF) is only partly read and never written; encrypted
   `.xlsx` opens with the password, but is saved without it.
-- **PivotTables.** No slicers, calculated items or PivotCharts; never checked in Excel.
+- **PivotTables.** Slicers, PivotCharts and calculated fields exist; calculated items do not. PivotTables
+  were never checked in Excel.
 - **Keyboard.** Ribbon keytips are still partial, with fewer shortcuts than Excel.
 - **Localization.** The interface offers 19 languages, but strings are missing in all of them —
   from 78 in Japanese to more than 800 in Turkish; `cargo xtask i18n-report` lists what is missing
