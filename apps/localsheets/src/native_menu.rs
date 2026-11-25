@@ -184,8 +184,8 @@ fn tree() -> Vec<(&'static str, Vec<Entry>)> {
                 ("Check for Updates…", "app.checkForUpdates", None),
                 ("Agent Control (MCP)…", "dialog:agents", None),
                 ("Contributors…", "dialog:about:Contributors", None),
-                ("Local Sheets on GitHub", "url:https://github.com/Anon5T4R/local-sheets", None),
-                ("Report an Issue…", "url:https://github.com/Anon5T4R/local-sheets/issues", None),
+                ("Local Sheets on GitHub", "url:https://github.com/Styx-Studios/Local-Sheets", None),
+                ("Report an Issue…", "url:https://github.com/Styx-Studios/Local-Sheets/issues", None),
             ],
         ),
     ]

@@ -155,7 +155,7 @@ binaries need glibc ≥ 2.35. X11/Wayland/xkbcommon/Vulkan/EGL are loaded at run
 packages declare them (see `nfpm.yaml`).
 
 Each AppImage embeds update information
-(`gh-releases-zsync|Anon5T4R|local-sheets|latest|localsheets-*-linux-<arch>.AppImage.zsync`), and the
+(`gh-releases-zsync|Styx-Studios|Local-Sheets|latest|localsheets-*-linux-<arch>.AppImage.zsync`), and the
 matching `.zsync` is published beside it, so AppImageUpdate and AppImageLauncher fetch only the
 changed blocks of the newest published release. appimagetool writes the `.zsync` when
 `zsyncmake` (the `zsync` package) is installed; without it the script warns and skips it.

@@ -47,9 +47,9 @@
 
     <Icon Id="LocalSheetsIcon.exe" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="LocalSheetsIcon.exe" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Anon5T4R/local-sheets" />
-    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/Anon5T4R/local-sheets/releases" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/Anon5T4R/local-sheets/issues" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Styx-Studios/Local-Sheets" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/Styx-Studios/Local-Sheets/releases" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Styx-Studios/Local-Sheets/issues" />
 
     <!-- Installer UI: WixUI_Minimal is welcome + license, progress, then a finish page so people
          can see the install worked. package.ps1 builds the license RTF from LICENSE-MIT and

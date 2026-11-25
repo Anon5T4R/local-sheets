@@ -11,7 +11,7 @@ entra sem revisão. Regras gerais em `docs/planos/licoes-de-porta.md` (dev-notes
   commits do `main` de 03/nov já vinham nela (`065f05db` MODE por índice/FREQUENCY por busca binária
   e `db05400e` cada dependente listado uma vez), com código e teste. Eles não são reaplicáveis; a
   base para os próximos syncs continua `e581bc95`.
-- Fork: `Anon5T4R/local-sheets`, versão própria na linha `0.2.x` (numeração nova evita auto-update
+- Fork: `Styx-Studios/Local-Sheets`, versão própria na linha `0.2.x` (numeração nova evita auto-update
   falso para o upstream).
 - Nada é lido de `C:\Dev\storytold` em build, teste ou release; a pasta é só referência local para
   a skill `sync-upstream`.
@@ -23,7 +23,7 @@ entra sem revisão. Regras gerais em `docs/planos/licoes-de-porta.md` (dev-notes
 | Caminho | Origem | Rev |
 |---|---|---|
 | `libs/craft-libs` | `storytold/craft-libs` | `c5a1cbf` (com `vendor/`) |
-| `libs/craft-libs/crates/update` | **`Anon5T4R/local-libs`** (fonte única da suíte) | conferido pelo `scripts/check-mirror.sh` |
+| `libs/craft-libs/crates/update` | **`Styx-Studios/local-libs`** (fonte única da suíte) | conferido pelo `scripts/check-mirror.sh` |
 | `libs/egui` | `storytold/egui` | `6d518fc` |
 | `libs/winit` | `storytold/winit` | `a517b38` |
 | `libs/winprint.rs` | `storytold/winprint.rs` | `417ac3c` |
