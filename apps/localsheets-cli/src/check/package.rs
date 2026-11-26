@@ -110,8 +110,18 @@ fn resolve_target(source_dir: &str, target: &str) -> String {
 
 type Zip<'a> = zip::ZipArchive<Cursor<&'a [u8]>>;
 
-fn zip_names(zip: &mut Zip<'_>) -> Vec<String> {
-    (0..zip.len().min(MAX_ENTRIES)).filter_map(|i| zip.by_index_raw(i).ok().filter(|f| !f.is_dir()).map(|f| f.name().to_string())).collect()
+fn zip_names(zip: &mut Zip<'_>) -> Result<Vec<String>, String> {
+    let mut names = Vec::new();
+    for i in 0..zip.len().min(MAX_ENTRIES) {
+        let Ok(f) = zip.by_index_raw(i) else { continue };
+        if f.is_dir() {
+            continue;
+        }
+        // zip 9 reports a failure instead of a name when an entry name decodes neither as UTF-8
+        // nor as CP437 (practically unreachable): such a package cannot be checked.
+        names.push(f.name().map_err(|e| format!("entry {i}: {e}"))?.to_string());
+    }
+    Ok(names)
 }
 
 fn read_zip_part(zip: &mut Zip<'_>, name: &str) -> Result<Vec<u8>, String> {
@@ -149,7 +159,7 @@ fn read_zip_part_within(zip: &mut Zip<'_>, name: &str, budget: &mut u64) -> Resu
 /// libraries that don't calculate write it, and store 0 or nothing as every formula's value.
 pub(super) fn full_calc_on_load(bytes: &[u8]) -> bool {
     let Ok(mut zip) = zip::ZipArchive::new(Cursor::new(bytes)) else { return false };
-    let names = zip_names(&mut zip);
+    let Ok(names) = zip_names(&mut zip) else { return false };
     let find = |key: &str| names.iter().find(|n| part_key(n) == key).cloned();
     let mut workbook = "xl/workbook.xml".to_string();
     if let Some(rels) = find("_rels/.rels")
@@ -176,7 +186,7 @@ pub(super) fn full_calc_on_load(bytes: &[u8]) -> bool {
 /// and internal relationships pointing at missing parts. `Err` when the package can't be read.
 pub fn validate_package(bytes: &[u8]) -> Result<Vec<String>, String> {
     let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("not a zip package: {e}"))?;
-    let names = zip_names(&mut zip);
+    let names = zip_names(&mut zip)?;
     let parts: HashSet<String> = names.iter().map(|n| part_key(n)).collect();
     let mut read_part = |name: &str| read_zip_part(&mut zip, name);
     let mut issues = Vec::new();
@@ -267,7 +277,7 @@ pub(super) fn relationship_kinds(bytes: &[u8]) -> Result<BTreeMap<String, String
 /// parts alone need more: their kinds can't be listed completely.
 fn relationship_kinds_within(bytes: &[u8], mut budget: u64) -> Result<BTreeMap<String, String>, String> {
     let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("not a zip package: {e}"))?;
-    let names = zip_names(&mut zip);
+    let names = zip_names(&mut zip)?;
     let by_key: HashMap<String, &String> = names.iter().map(|n| (part_key(n), n)).collect();
     // Several relationships name the same part; each fresh check decompressed it again, so
     // repeated references to one highly compressible part multiplied the work. The verdict is

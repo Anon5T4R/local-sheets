@@ -280,7 +280,9 @@ impl Import {
                 Event::GeneralRef(r) => {
                     let ch = match r.resolve_char_ref().map_err(xml_error)? {
                         Some(c) => c,
-                        None => match r.as_ref() {
+                        // `zip` 9 brings `typed-path`, whose `AsRef<Path<_>> for [u8]` makes the
+                        // `as_ref()` lookup ambiguous: take the entity bytes explicitly.
+                        None => match &*r {
                             b"amp" => '&',
                             b"lt" => '<',
                             b"gt" => '>',
